@@ -53,11 +53,17 @@ export const MarketsTable = ({ className }: { className?: string }) => {
         ? ([
             {
               columnKey: 'market',
-              getCellValue: (row) => row.market,
+              getCellValue: (row) => row.id,
               label: stringGetter({ key: STRING_KEYS.MARKET }),
-              renderCell: ({ asset, effectiveInitialMarginFraction, initialMarginFraction }) => (
+              renderCell: ({
+                assetId,
+                effectiveInitialMarginFraction,
+                initialMarginFraction,
+                name,
+              }) => (
                 <AssetTableCell
-                  asset={asset}
+                  symbol={assetId}
+                  name={name}
                   configs={{ effectiveInitialMarginFraction, initialMarginFraction }}
                 />
               ),
@@ -103,11 +109,17 @@ export const MarketsTable = ({ className }: { className?: string }) => {
         : ([
             {
               columnKey: 'market',
-              getCellValue: (row) => row.market,
+              getCellValue: (row) => row.id,
               label: stringGetter({ key: STRING_KEYS.MARKET }),
-              renderCell: ({ asset, effectiveInitialMarginFraction, initialMarginFraction }) => (
+              renderCell: ({
+                assetId,
+                effectiveInitialMarginFraction,
+                initialMarginFraction,
+                name,
+              }) => (
                 <AssetTableCell
-                  asset={asset}
+                  symbol={assetId}
+                  name={name}
                   configs={{ effectiveInitialMarginFraction, initialMarginFraction }}
                 />
               ),
@@ -130,7 +142,7 @@ export const MarketsTable = ({ className }: { className?: string }) => {
               renderCell: ({ line, priceChange24HPercent }) => (
                 <div tw="h-2 w-3">
                   <SparklineChart
-                    data={(line?.toArray() ?? []).map((datum, index) => ({
+                    data={(line ?? []).map((datum, index) => ({
                       x: index + 1,
                       y: parseFloat(datum.toString()),
                     }))}
@@ -226,7 +238,7 @@ export const MarketsTable = ({ className }: { className?: string }) => {
       <$Table
         withInnerBorders
         data={filteredMarkets}
-        getRowKey={(row: MarketData) => row.market ?? ''}
+        getRowKey={(row: MarketData) => row.id ?? ''}
         label="Markets"
         onRowAction={(market: Key) =>
           navigate(`${AppRoute.Trade}/${market}`, { state: { from: AppRoute.Markets } })
