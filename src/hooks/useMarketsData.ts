@@ -13,6 +13,7 @@ import { useAppSelector } from '@/state/appTypes';
 import { getAssets } from '@/state/assetsSelectors';
 import { getPerpetualMarkets, getPerpetualMarketsClobIds } from '@/state/perpetualsSelectors';
 
+import { getDisplayableAssetFromBaseAsset, getDisplayableTickerFromMarket } from '@/lib/assetUtils';
 import { isTruthy } from '@/lib/isTruthy';
 import { objectKeys, safeAssign } from '@/lib/objectHelpers';
 import { matchesSearchFilter } from '@/lib/search';
@@ -33,6 +34,9 @@ const filterFunctions = {
   },
   [MarketFilters.GAMING]: (market: MarketData) => {
     return market.tags?.includes('Gaming');
+  },
+  [MarketFilters.LAUNCHABLE]: (market: MarketData) => {
+    return market.tags?.includes('Launchable');
   },
   [MarketFilters.LAYER_1]: (market: MarketData) => {
     return market.tags?.includes('Layer 1');
@@ -124,34 +128,34 @@ export const useMarketsData = (
         );
       });
 
-    // launchableMarketsQuery.data?.forEach((market) => {
-    //   const toPush: MarketData = safeAssign(
-    //     {},
-    //     {
-    //       id: market.id,
-    //       assetId: getDisplayableAssetFromBaseAsset(market.ticker.currency_pair.Base),
-    //       displayId: getDisplayableTickerFromMarket(market.id),
-    //       clobPairId: Infinity,
-    //       effectiveInitialMarginFraction: null,
-    //       initialMarginFraction: null,
-    //       isNew: false,
-    //       line: null,
-    //       name: getDisplayableTickerFromMarket(market.id),
-    //       nextFundingRate: null,
-    //       openInterest: 0,
-    //       openInterestUSDC: 0,
-    //       oraclePrice: null,
-    //       priceChange24H: null,
-    //       priceChange24HPercent: null,
-    //       tags: null,
-    //       tickSizeDecimals: 0,
-    //       trades24H: null,
-    //       volume24H: 0,
-    //     }
-    //   );
+    launchableMarketsQuery.data?.forEach((market) => {
+      const toPush: MarketData = safeAssign(
+        {},
+        {
+          id: market.id,
+          assetId: getDisplayableAssetFromBaseAsset(market.ticker.currency_pair.Base),
+          displayId: getDisplayableTickerFromMarket(market.id),
+          clobPairId: Infinity,
+          effectiveInitialMarginFraction: null,
+          initialMarginFraction: null,
+          isNew: false,
+          line: null,
+          name: getDisplayableTickerFromMarket(market.id),
+          nextFundingRate: null,
+          openInterest: 0,
+          openInterestUSDC: 0,
+          oraclePrice: null,
+          priceChange24H: null,
+          priceChange24HPercent: null,
+          tags: ['Launchable'],
+          tickSizeDecimals: 0,
+          trades24H: null,
+          volume24H: 0,
+        }
+      );
 
-    //   listOfMarkets.push(toPush);
-    // });
+      listOfMarkets.push(toPush);
+    });
 
     return listOfMarkets;
   }, [
@@ -180,6 +184,7 @@ export const useMarketsData = (
     () => [
       MarketFilters.ALL,
       MarketFilters.NEW,
+      MarketFilters.LAUNCHABLE,
       ...objectKeys(MARKET_FILTER_OPTIONS).filter((marketFilter) =>
         markets.some((market) => market.tags?.some((tag) => tag === marketFilter))
       ),

@@ -32,6 +32,7 @@ export enum MarketSorting {
 export enum MarketFilters {
   ALL = 'all',
   NEW = 'new',
+  LAUNCHABLE = 'Launchable',
   PREDICTION_MARKET = 'Prediction Market',
   LAYER_1 = 'Layer 1',
   LAYER_2 = 'Layer 2',
@@ -56,6 +57,9 @@ export const MARKET_FILTER_OPTIONS: Record<
   },
   [MarketFilters.NEW]: {
     label: STRING_KEYS.RECENTLY_LISTED,
+  },
+  [MarketFilters.LAUNCHABLE]: {
+    isNew: true,
   },
   [MarketFilters.PREDICTION_MARKET]: {
     label: STRING_KEYS.PREDICTION_MARKET,

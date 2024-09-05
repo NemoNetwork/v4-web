@@ -172,7 +172,8 @@ export function formatNumberOutput(
   const numberRenderers = {
     [OutputType.CompactNumber]: () => {
       if (!isNumber(value)) {
-        throw new Error('value must be a number for compact number output');
+        return null;
+        // throw new Error('value must be a number for compact number output');
       }
 
       return Intl.NumberFormat(selectedLocale, {
@@ -186,7 +187,8 @@ export function formatNumberOutput(
     [OutputType.SmallFiat]: () => getFormattedVal(valueBN, SMALL_USD_DECIMALS, { prefix: '$' }),
     [OutputType.CompactFiat]: () => {
       if (!isNumber(value)) {
-        throw new Error('value must be a number for compact fiat output');
+        return null;
+        // throw new Error('value must be a number for compact fiat output');
       }
 
       return Intl.NumberFormat(selectedLocale, {
