@@ -88,12 +88,12 @@ const ENV_CONFIG = {
     indexerWsEndpoint: '',
   },
   [Env.DEV]: {
-    chainId: 'dydxprotocol-testnet',
+    chainId: 'nemo-testnet',
     blockTimeSeconds: 1,
     numValidators: 4,
-    validatorEndpoint: 'http://3.134.210.83:26657',
-    indexerRestEndpoint: 'https://indexer.v4dev.dydx.exchange',
-    indexerWsEndpoint: 'wss://indexer.v4dev.dydx.exchange',
+    validatorEndpoint: 'testnet-rpc.nemonetwork.org',
+    indexerRestEndpoint: 'https://testnet-indexer.nemonetwork.org',
+    indexerWsEndpoint: 'wss://testnet-wsindexer.nemonetwork.org',
   },
   [Env.DEV2]: {
     chainId: 'dydxprotocol-testnet',
@@ -132,8 +132,8 @@ const ENV_CONFIG = {
     blockTimeSeconds: 1,
     numValidators: 10,
     validatorEndpoint: 'http://18.188.95.153:26657',
-    indexerRestEndpoint: 'https://indexer.v4staging.dydx.exchange',
-    indexerWsEndpoint: 'wss://indexer.v4staging.dydx.exchange',
+    indexerRestEndpoint: 'https://testnet-indexer.nemonetwork.org',
+    indexerWsEndpoint: 'wss://testnet-wsindexer.nemonetwork.org',
   },
 };
 
