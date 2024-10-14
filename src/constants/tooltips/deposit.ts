@@ -1,10 +1,9 @@
-import { TOOLTIP_STRING_KEYS, type TooltipStrings } from '@/constants/localization';
-import { StatSigFlags } from '@/constants/statsig';
+import { TOOLTIP_STRING_KEYS, TooltipStrings } from '@/constants/localization';
 
 import { TransferType } from '../abacus';
 import { getLowestFeeChainNames } from '../cctp';
 
-export const depositTooltips: TooltipStrings = {
+export const depositTooltips = {
   'minimum-deposit-amount': ({ stringGetter }) => ({
     title: stringGetter({ key: TOOLTIP_STRING_KEYS.MINIMUM_DEPOSIT_AMOUNT_TITLE }),
     body: stringGetter({ key: TOOLTIP_STRING_KEYS.MINIMUM_DEPOSIT_AMOUNT_BODY }),
@@ -13,15 +12,13 @@ export const depositTooltips: TooltipStrings = {
     title: stringGetter({ key: TOOLTIP_STRING_KEYS.SWAP_TITLE }),
     body: stringGetter({ key: TOOLTIP_STRING_KEYS.SWAP_BODY }),
   }),
-  'lowest-fees-deposit': ({ stringGetter, featureFlags }) => ({
+  // can pipe in featureflags as a param here like so: ({ stringGetter, featureFlags })
+  'lowest-fees-deposit': ({ stringGetter }) => ({
     title: stringGetter({ key: TOOLTIP_STRING_KEYS.LOWEST_FEE_DEPOSITS_TITLE }),
     body: stringGetter({
       key: TOOLTIP_STRING_KEYS.LOWEST_FEE_DEPOSITS_BODY,
       params: {
-        LOWEST_FEE_TOKEN_NAMES: getLowestFeeChainNames(
-          TransferType.deposit,
-          featureFlags?.[StatSigFlags.ffSkipMigration] ?? false
-        ).join(', '),
+        LOWEST_FEE_TOKEN_NAMES: getLowestFeeChainNames(TransferType.deposit).join(', '),
       },
     }),
   }),
@@ -33,4 +30,4 @@ export const depositTooltips: TooltipStrings = {
     title: stringGetter({ key: TOOLTIP_STRING_KEYS.BRIDGE_FEES_DEPOSIT_TITLE }),
     body: stringGetter({ key: TOOLTIP_STRING_KEYS.BRIDGE_FEES_DEPOSIT_BODY }),
   }),
-} as const;
+} satisfies TooltipStrings;

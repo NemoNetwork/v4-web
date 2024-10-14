@@ -52,6 +52,7 @@ import {
   MenuIcon,
   MigrateIcon,
   MintscanIcon,
+  MobileIcon,
   MoneyIcon,
   MoonIcon,
   OrderCanceledIcon,
@@ -71,6 +72,8 @@ import {
   PrivacyIcon,
   QrIcon,
   RewardStarIcon,
+  RocketIcon,
+  RoundedArrowIcon,
   SearchIcon,
   SendIcon,
   ShareIcon,
@@ -84,6 +87,7 @@ import {
   TokenIcon,
   TradeIcon,
   TransferIcon,
+  TranslateIcon,
   TriangleIcon,
   TryAgainIcon,
   WarningIcon,
@@ -146,6 +150,7 @@ export enum IconName {
   Menu = 'Menu',
   Migrate = 'Migrate',
   Mintscan = 'Mintscan',
+  Mobile = 'Mobile',
   Money = 'Money',
   Moon = 'Moon',
   Onboarding = 'Onboarding',
@@ -166,6 +171,8 @@ export enum IconName {
   Privacy = 'Privacy',
   Qr = 'Qr',
   RewardStar = 'RewardStar',
+  Rocket = 'Rocket',
+  RoundedArrow = 'RoundedArrow',
   Search = 'Search',
   Send = 'Send',
   Share = 'Share',
@@ -178,6 +185,7 @@ export enum IconName {
   Token = 'Token',
   Trade = 'Trade',
   Transfer = 'Transfer',
+  Translate = 'Translate',
   Triangle = 'Triangle',
   TryAgain = 'TryAgain',
   Warning = 'Warning',
@@ -239,6 +247,7 @@ const icons = {
   [IconName.Menu]: MenuIcon,
   [IconName.Migrate]: MigrateIcon,
   [IconName.Mintscan]: MintscanIcon,
+  [IconName.Mobile]: MobileIcon,
   [IconName.Money]: MoneyIcon,
   [IconName.Moon]: MoonIcon,
   [IconName.Orderbook]: OrderbookIcon,
@@ -258,6 +267,8 @@ const icons = {
   [IconName.Privacy]: PrivacyIcon,
   [IconName.Qr]: QrIcon,
   [IconName.RewardStar]: RewardStarIcon,
+  [IconName.Rocket]: RocketIcon,
+  [IconName.RoundedArrow]: RoundedArrowIcon,
   [IconName.Search]: SearchIcon,
   [IconName.Send]: SendIcon,
   [IconName.Share]: ShareIcon,
@@ -270,6 +281,7 @@ const icons = {
   [IconName.Token]: TokenIcon,
   [IconName.Trade]: TradeIcon,
   [IconName.Transfer]: TransferIcon,
+  [IconName.Translate]: TranslateIcon,
   [IconName.Triangle]: TriangleIcon,
   [IconName.TryAgain]: TryAgainIcon,
   [IconName.Warning]: WarningIcon,
@@ -293,6 +305,7 @@ export const Icon = styled(
     iconName,
     iconComponent: Component = iconName && icons[iconName],
     className,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     size,
     ...props
   }: ElementProps & StyleProps & { size?: string }) =>
@@ -300,4 +313,6 @@ export const Icon = styled(
 )`
   width: ${({ size }) => size ?? '1em'};
   height: ${({ size }) => size ?? '1em'};
+  min-width: ${({ size }) => size ?? '1em'};
+  min-height: ${({ size }) => size ?? '1em'};
 `;

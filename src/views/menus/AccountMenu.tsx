@@ -17,14 +17,17 @@ import {
 } from '@/constants/localization';
 import { isDev } from '@/constants/networks';
 import { SMALL_USD_DECIMALS, USD_DECIMALS } from '@/constants/numbers';
-import { DydxChainAsset, wallets, WalletType } from '@/constants/wallets';
+import { StatsigFlags } from '@/constants/statsig';
+import { DydxChainAsset, WalletNetworkType, wallets, WalletType } from '@/constants/wallets';
 
 import { useAccountBalance } from '@/hooks/useAccountBalance';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useBreakpoints } from '@/hooks/useBreakpoints';
 import { useComplianceState } from '@/hooks/useComplianceState';
 import { useMobileAppUrl } from '@/hooks/useMobileAppUrl';
+import { useStatsigGateValue } from '@/hooks/useStatsig';
 import { useStringGetter } from '@/hooks/useStringGetter';
+import { useSubaccount } from '@/hooks/useSubaccount';
 import { useTokenConfigs } from '@/hooks/useTokenConfigs';
 import { useURLConfigs } from '@/hooks/useURLConfigs';
 
@@ -38,6 +41,7 @@ import { DropdownMenu } from '@/components/DropdownMenu';
 import { Icon, IconName } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { Output, OutputType } from '@/components/Output';
+import { Tag, TagSign } from '@/components/Tag';
 import { WalletIcon } from '@/components/WalletIcon';
 import { WithTooltip } from '@/components/WithTooltip';
 import { OnboardingTriggerButton } from '@/views/dialogs/OnboardingTriggerButton';
@@ -59,6 +63,7 @@ export const AccountMenu = () => {
   const { mintscanBase } = useURLConfigs();
   const { isTablet } = useBreakpoints();
   const { complianceState } = useComplianceState();
+  const affiliatesEnabled = useStatsigGateValue(StatsigFlags.ffEnableAffiliates);
 
   const dispatch = useAppDispatch();
   const onboardingState = useAppSelector(getOnboardingState);
@@ -69,13 +74,18 @@ export const AccountMenu = () => {
   const { usdcLabel, chainTokenLabel } = useTokenConfigs();
   const theme = useAppSelector(getAppTheme);
 
-  const { evmAddress, solAddress, connectedWallet, dydxAddress, hdKey } = useAccounts();
+  const {
+    sourceAccount: { walletInfo, address },
+    dydxAddress,
+    hdKey,
+  } = useAccounts();
+  const { registerAffiliate } = useSubaccount();
 
-  let address: string | undefined;
-  if (connectedWallet?.name === WalletType.Phantom) {
-    address = truncateAddress(solAddress, '');
+  let displayAddress: string | undefined;
+  if (walletInfo?.name === WalletType.Phantom) {
+    displayAddress = truncateAddress(address, '');
   } else {
-    address = truncateAddress(evmAddress, '0x');
+    displayAddress = truncateAddress(address, '0x');
   }
 
   const privy = usePrivy();
@@ -92,7 +102,7 @@ export const AccountMenu = () => {
   const usedBalanceBN = MustBigNumber(usdcBalance);
 
   const showConfirmPendingDeposit =
-    connectedWallet?.name === WalletType.Keplr &&
+    walletInfo?.name === WalletType.Keplr &&
     usedBalanceBN.gt(AMOUNT_RESERVED_FOR_GAS_USDC) &&
     usedBalanceBN.minus(AMOUNT_RESERVED_FOR_GAS_USDC).toFixed(2) !== '0.00';
 
@@ -101,7 +111,7 @@ export const AccountMenu = () => {
     walletIcon = <Icon iconName={IconName.Warning} tw="text-[1.25rem] text-color-warning" />;
   } else if (
     onboardingState === OnboardingState.AccountConnected &&
-    connectedWallet?.name === WalletType.Privy
+    walletInfo?.name === WalletType.Privy
   ) {
     if (google) {
       walletIcon = <Icon iconComponent={GoogleIcon as ElementType} />;
@@ -112,8 +122,8 @@ export const AccountMenu = () => {
     } else {
       walletIcon = <Icon iconComponent={wallets[WalletType.Privy].icon as ElementType} />;
     }
-  } else if (connectedWallet) {
-    walletIcon = <WalletIcon wallet={connectedWallet} />;
+  } else if (walletInfo) {
+    walletIcon = <WalletIcon wallet={walletInfo} />;
   }
 
   return onboardingState === OnboardingState.Disconnected ? (
@@ -126,24 +136,8 @@ export const AccountMenu = () => {
             <$AddressRow>
               <AssetIcon symbol="DYDX" tw="z-[2] text-[1.75rem]" />
               <$Column>
-                {connectedWallet && connectedWallet?.name !== WalletType.Keplr ? (
-                  <WithTooltip
-                    slotTooltip={
-                      <dl>
-                        <dt>
-                          {stringGetter({
-                            key: TOOLTIP_STRING_KEYS.DYDX_ADDRESS_BODY,
-                            params: {
-                              DYDX_ADDRESS: <strong>{truncateAddress(dydxAddress)}</strong>,
-                              EVM_ADDRESS: truncateAddress(evmAddress, '0x'),
-                            },
-                          })}
-                        </dt>
-                      </dl>
-                    }
-                  >
-                    <$label>{stringGetter({ key: STRING_KEYS.DYDX_CHAIN_ADDRESS })}</$label>
-                  </WithTooltip>
+                {walletInfo && walletInfo?.name !== WalletType.Keplr ? (
+                  <DydxDerivedAddress address={address} />
                 ) : (
                   <$label>{stringGetter({ key: STRING_KEYS.DYDX_CHAIN_ADDRESS })}</$label>
                 )}
@@ -160,20 +154,20 @@ export const AccountMenu = () => {
                 />
               </WithTooltip>
             </$AddressRow>
-            {connectedWallet &&
-              connectedWallet.name !== WalletType.Privy &&
-              connectedWallet.name !== WalletType.Keplr && (
+            {walletInfo &&
+              walletInfo.name !== WalletType.Privy &&
+              walletInfo.name !== WalletType.Keplr && (
                 <$AddressRow>
                   <div tw="relative z-[1] rounded-[50%] bg-[#303045] p-0.375 text-[1rem] leading-[0]">
                     <Icon
                       iconName={IconName.AddressConnector}
                       tw="absolute top-[-1.625rem] h-1.75"
                     />
-                    <WalletIcon wallet={connectedWallet} />
+                    <WalletIcon wallet={walletInfo} />
                   </div>
                   <$Column>
                     <$label>{stringGetter({ key: STRING_KEYS.SOURCE_ADDRESS })}</$label>
-                    <$Address>{address}</$Address>
+                    <$Address>{displayAddress}</$Address>
                   </$Column>
                 </$AddressRow>
               )}
@@ -276,6 +270,20 @@ export const AccountMenu = () => {
           onSelect: onRecoverKeys,
           separator: true,
         },
+        affiliatesEnabled &&
+          onboardingState === OnboardingState.AccountConnected && {
+            value: 'Affiliates',
+            icon: <Icon iconName={IconName.Giftbox} />,
+            label: (
+              <span>
+                {stringGetter({ key: STRING_KEYS.INVITE_FRIENDS })}{' '}
+                <Tag sign={TagSign.Positive}>{stringGetter({ key: STRING_KEYS.EARN_FEES })}</Tag>
+              </span>
+            ),
+            onSelect: () => {
+              dispatch(openDialog(DialogTypes.ShareAffiliate()));
+            },
+          },
         {
           value: 'Preferences',
           icon: <Icon iconName={IconName.Gear} />,
@@ -293,6 +301,21 @@ export const AccountMenu = () => {
           label: stringGetter({ key: STRING_KEYS.DISPLAY_SETTINGS }),
           onSelect: () => dispatch(openDialog(DialogTypes.DisplaySettings())),
         },
+        ...(isDev
+          ? [
+              {
+                value: 'registerAffiliate',
+                icon: <Icon iconName={IconName.Gear} />,
+                label: 'Register Affiliate',
+                onSelect: () => {
+                  const affiliate = window.prompt('Enter affiliate address');
+                  if (affiliate) {
+                    registerAffiliate(affiliate);
+                  }
+                },
+              },
+            ]
+          : []),
         ...(isDev
           ? [
               {
@@ -365,6 +388,47 @@ export const AccountMenu = () => {
       {walletIcon}
       {!isTablet && <$Address>{truncateAddress(dydxAddress)}</$Address>}
     </$DropdownMenu>
+  );
+};
+
+const DydxDerivedAddress = ({
+  address,
+  chain,
+  dydxAddress,
+}: {
+  address?: string;
+  chain?: WalletNetworkType.Solana | WalletNetworkType.Evm;
+  dydxAddress?: string;
+}) => {
+  const stringGetter = useStringGetter();
+
+  const tooltipText =
+    chain === WalletNetworkType.Solana
+      ? stringGetter({
+          key: TOOLTIP_STRING_KEYS.DYDX_ADDRESS_FROM_SOLANA_BODY,
+          params: {
+            DYDX_ADDRESS: <strong>{truncateAddress(dydxAddress)}</strong>,
+            SOLANA_ADDRESS: truncateAddress(address, ''),
+          },
+        })
+      : stringGetter({
+          key: TOOLTIP_STRING_KEYS.DYDX_ADDRESS_FROM_ETHEREUM_BODY,
+          params: {
+            DYDX_ADDRESS: <strong>{truncateAddress(dydxAddress)}</strong>,
+            EVM_ADDRESS: truncateAddress(address, '0x'),
+          },
+        });
+
+  return (
+    <WithTooltip
+      slotTooltip={
+        <dl>
+          <dt>{tooltipText}</dt>
+        </dl>
+      }
+    >
+      <$label>{stringGetter({ key: STRING_KEYS.DYDX_CHAIN_ADDRESS })}</$label>
+    </WithTooltip>
   );
 };
 

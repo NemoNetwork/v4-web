@@ -16,12 +16,26 @@ export const getAppTheme = (state: RootState): AppTheme => {
   }
 };
 
-const DARK_CHART_BACKGROUND_URL = '/chart-dots-background-dark.svg';
-const LIGHT_CHART_BACKGROUND_URL = '/chart-dots-background-light.svg';
+const ChartDotBackgrounds = {
+  [AppTheme.Dark]: '/chart-dots-background-dark.svg',
+  [AppTheme.Classic]: '/chart-dots-background-dark.svg',
+  [AppTheme.Light]: '/chart-dots-background-light.svg',
+};
+
+const GridBackgrounds = {
+  [AppTheme.Dark]: '/grid-background-dark.svg',
+  [AppTheme.Classic]: '/grid-background-dark.svg',
+  [AppTheme.Light]: '/grid-background-light.svg',
+};
 
 export const getChartDotBackground = (state: RootState): string => {
   const appTheme = getAppTheme(state);
-  return appTheme === AppTheme.Light ? LIGHT_CHART_BACKGROUND_URL : DARK_CHART_BACKGROUND_URL;
+  return ChartDotBackgrounds[appTheme];
+};
+
+export const getGridBackground = (state: RootState): string => {
+  const appTheme = getAppTheme(state);
+  return GridBackgrounds[appTheme];
 };
 
 export const getAppColorMode = (state: RootState) => state.configs.appColorMode;
@@ -40,3 +54,5 @@ export const getHasSeenLaunchIncentives = (state: RootState) =>
 
 export const getDefaultToAllMarketsInPositionsOrdersFills = (state: RootState) =>
   state.configs.defaultToAllMarketsInPositionsOrdersFills;
+
+export const getSelectedDisplayUnit = (state: RootState) => state.configs.displayUnit;

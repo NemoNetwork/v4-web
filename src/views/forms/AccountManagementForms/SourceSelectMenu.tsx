@@ -12,12 +12,10 @@ import {
 import { SUPPORTED_COSMOS_CHAINS } from '@/constants/graz';
 import { STRING_KEYS } from '@/constants/localization';
 import { EMPTY_ARR } from '@/constants/objects';
-import { StatSigFlags } from '@/constants/statsig';
 import { ConnectorType, WalletType } from '@/constants/wallets';
 
 import { useAccounts } from '@/hooks/useAccounts';
 import { useEnvFeatures } from '@/hooks/useEnvFeatures';
-import { useStatsigGateValue } from '@/hooks/useStatsig';
 import { useStringGetter } from '@/hooks/useStringGetter';
 
 import { SearchSelectMenu } from '@/components/SearchSelectMenu';
@@ -46,12 +44,14 @@ export const SourceSelectMenu = ({
   selectedChain,
   onSelect,
 }: ElementProps) => {
-  const { connectedWallet } = useAccounts();
+  const { sourceAccount } = useAccounts();
   const selectedDydxChainId = useAppSelector(getSelectedDydxChainId);
   const { CCTPWithdrawalOnly, CCTPDepositOnly: initialCCTPDepositValue } = useEnvFeatures();
   // Only CCTP deposits are supported for Phantom / Solana
   const CCTPDepositOnly =
-    connectedWallet?.connectorType === ConnectorType.PhantomSolana ? true : initialCCTPDepositValue;
+    sourceAccount.walletInfo?.connectorType === ConnectorType.PhantomSolana
+      ? true
+      : initialCCTPDepositValue;
 
   const stringGetter = useStringGetter();
   const { type, depositOptions, withdrawalOptions } =
@@ -64,18 +64,10 @@ export const SourceSelectMenu = ({
     (type === TransferType.deposit ? depositOptions : withdrawalOptions)?.exchanges?.toArray() ??
     EMPTY_ARR;
 
-  const skipEnabled = useStatsigGateValue(StatSigFlags.ffSkipMigration);
+  const lowestFeeTokensByChainId = useMemo(() => getMapOfLowestFeeTokensByChainId(type), [type]);
 
-  const lowestFeeTokensByChainId = useMemo(
-    () => getMapOfLowestFeeTokensByChainId(type, skipEnabled),
-    [type, skipEnabled]
-  );
-
-  const highestFeeTokensByChainId = useMemo(
-    () => getMapOfHighestFeeTokensByChainId(type, skipEnabled),
-    [type, skipEnabled]
-  );
-  const isKeplrWallet = connectedWallet?.name === WalletType.Keplr;
+  const highestFeeTokensByChainId = useMemo(() => getMapOfHighestFeeTokensByChainId(type), [type]);
+  const isKeplrWallet = sourceAccount.walletInfo?.name === WalletType.Keplr;
 
   // withdrawals SourceSelectMenu is half width size so we must throw the decorator text
   // in the description prop (renders below the item label) instead of in the slotAfter
@@ -103,7 +95,7 @@ export const SourceSelectMenu = ({
         return selectedDydxChainId !== chain.value && SUPPORTED_COSMOS_CHAINS.includes(chain.value);
       }
       // only solana chains are supported on phantom
-      if (connectedWallet?.connectorType === ConnectorType.PhantomSolana) {
+      if (sourceAccount.walletInfo?.connectorType === ConnectorType.PhantomSolana) {
         return selectedDydxChainId !== chain.value && chain.value.startsWith(solanaChainIdPrefix);
       }
       // other wallets do not support solana
@@ -140,7 +132,7 @@ export const SourceSelectMenu = ({
   const selectedChainOption = chains.find((item) => item.type === selectedChain);
   const selectedExchangeOption = exchanges.find((item) => item.type === selectedExchange);
   const isNotPrivyDeposit =
-    type === TransferType.withdrawal || connectedWallet?.name !== WalletType.Privy;
+    type === TransferType.withdrawal || sourceAccount.walletInfo?.name !== WalletType.Privy;
   return (
     <SearchSelectMenu
       items={[
@@ -158,7 +150,12 @@ export const SourceSelectMenu = ({
             items: chainItems,
           },
       ].filter(isTruthy)}
-      label={label ?? (type === TransferType.deposit ? 'Source' : 'Destination')}
+      label={
+        label ??
+        stringGetter({
+          key: type === TransferType.deposit ? STRING_KEYS.SOURCE : STRING_KEYS.DESTINATION,
+        })
+      }
     >
       <div tw="row gap-0.5 text-color-text-2 font-base-book">
         {selectedChainOption ? (

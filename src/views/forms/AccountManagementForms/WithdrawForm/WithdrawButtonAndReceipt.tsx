@@ -8,11 +8,8 @@ import { TransferInputTokenResource } from '@/constants/abacus';
 import { ButtonAction, ButtonSize, ButtonType } from '@/constants/buttons';
 import { STRING_KEYS } from '@/constants/localization';
 import { NumberSign, TOKEN_DECIMALS } from '@/constants/numbers';
-import { SKIP_EST_TIME_DEFAULT_MINUTES } from '@/constants/skip';
-import { StatSigFlags } from '@/constants/statsig';
 
 import { ConnectionErrorType, useApiState } from '@/hooks/useApiState';
-import { useStatsigGateValue } from '@/hooks/useStatsig';
 import { useStringGetter } from '@/hooks/useStringGetter';
 import { useTokenConfigs } from '@/hooks/useTokenConfigs';
 
@@ -67,18 +64,9 @@ export const WithdrawButtonAndReceipt = ({
   const canAccountTrade = useAppSelector(calculateCanAccountTrade, shallowEqual);
   const { usdcLabel } = useTokenConfigs();
   const { connectionError } = useApiState();
-  const isSkipEnabled = useStatsigGateValue(StatSigFlags.ffSkipMigration);
 
   const showExchangeRate =
-    (!isSkipEnabled && !exchange) ||
-    (withdrawToken && typeof summary?.exchangeRate === 'number' && !exchange);
-  const showMinAmountReceived = !isSkipEnabled || typeof summary?.toAmountMin === 'number';
-  const fallbackRouteDuration = stringGetter({
-    key: STRING_KEYS.X_MINUTES_LOWERCASED,
-    params: {
-      X: `< ${SKIP_EST_TIME_DEFAULT_MINUTES}`,
-    },
-  });
+    !exchange || (withdrawToken && typeof summary?.exchangeRate === 'number' && !exchange);
 
   const submitButtonReceipt = [
     {
@@ -93,23 +81,6 @@ export const WithdrawButtonAndReceipt = ({
       value: (
         <Output type={OutputType.Asset} value={summary?.toAmount} fractionDigits={TOKEN_DECIMALS} />
       ),
-    },
-    showMinAmountReceived && {
-      key: 'minimum-amount-received',
-      label: (
-        <$RowWithGap>
-          {stringGetter({ key: STRING_KEYS.MINIMUM_AMOUNT_RECEIVED })}
-          {withdrawToken && <Tag>{withdrawToken?.symbol}</Tag>}
-        </$RowWithGap>
-      ),
-      value: (
-        <Output
-          type={OutputType.Asset}
-          value={summary?.toAmountMin}
-          fractionDigits={TOKEN_DECIMALS}
-        />
-      ),
-      tooltip: 'minimum-amount-received',
     },
     showExchangeRate && {
       key: 'exchange-rate',
@@ -158,22 +129,20 @@ export const WithdrawButtonAndReceipt = ({
       key: 'estimated-route-duration',
       label: <span>{stringGetter({ key: STRING_KEYS.ESTIMATED_TIME })}</span>,
       value:
-        summary != null && typeof summary.estimatedRouteDuration === 'number' ? (
+        typeof summary?.estimatedRouteDurationSeconds === 'number' ? (
           <Output
             type={OutputType.Text}
             value={stringGetter({
               key: STRING_KEYS.X_MINUTES_LOWERCASED,
               params: {
                 X:
-                  summary.estimatedRouteDuration < 60
+                  summary.estimatedRouteDurationSeconds < 60
                     ? '< 1'
-                    : Math.round(summary.estimatedRouteDuration / 60),
+                    : Math.round(summary.estimatedRouteDurationSeconds / 60),
               },
             })}
           />
-        ) : isSkipEnabled ? (
-          fallbackRouteDuration
-        ) : null,
+        ) : undefined,
     },
     {
       key: 'leverage',

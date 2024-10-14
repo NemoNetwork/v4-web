@@ -38,6 +38,7 @@ type ElementProps = {
   onBack?: () => void;
   preventClose?: boolean;
   slotTrigger?: React.ReactNode;
+  slotHeaderAbove?: React.ReactNode;
   slotHeaderInner?: React.ReactNode;
   slotFooter?: React.ReactNode;
   withClose?: boolean;
@@ -80,6 +81,7 @@ export const Dialog = ({
   onBack,
   preventClose,
   slotTrigger,
+  slotHeaderAbove,
   slotHeaderInner,
   slotFooter,
   stacked,
@@ -114,6 +116,7 @@ export const Dialog = ({
           $stacked={stacked}
           $withAnimation={withAnimation}
         >
+          {slotHeaderAbove}
           {stacked ? (
             <$StackedHeaderTopRow $withBorder={hasHeaderBorder} $withBlur={hasHeaderBlur}>
               {onBack && <$BackButton onClick={onBack} />}
@@ -174,6 +177,7 @@ const $Overlay = styled(Overlay)`
 
   pointer-events: none !important;
 
+  -webkit-backdrop-filter: brightness(var(--overlay-filter));
   backdrop-filter: brightness(var(--overlay-filter));
 `;
 
