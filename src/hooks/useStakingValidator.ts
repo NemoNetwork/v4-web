@@ -1,9 +1,9 @@
 import { useState } from 'react';
 
 import {
-  BondStatus,
-  Validator,
-} from '@dydxprotocol/v4-proto/src/codegen/cosmos/staking/v1beta1/staking';
+    BondStatus,
+    Validator,
+} from '@nemo-network/v4-proto/src/codegen/cosmos/staking/v1beta1/staking';
 import { useQuery } from '@tanstack/react-query';
 import { groupBy } from 'lodash';
 import { shallowEqual } from 'react-redux';

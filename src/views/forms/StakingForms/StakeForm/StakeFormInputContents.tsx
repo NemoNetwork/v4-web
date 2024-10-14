@@ -1,7 +1,7 @@
 import { Dispatch, SetStateAction, useMemo } from 'react';
 
-import { Validator } from '@dydxprotocol/v4-proto/src/codegen/cosmos/staking/v1beta1/staking';
 import { SelectedGasDenom } from '@nemo-network/v4-client-js/src';
+import { Validator } from '@nemo-network/v4-proto/src/codegen/cosmos/staking/v1beta1/staking';
 import BigNumber from 'bignumber.js';
 import { debounce } from 'lodash';
 import { NumberFormatValues } from 'react-number-format';

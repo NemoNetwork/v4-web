@@ -2,13 +2,13 @@ import { EncodeObject } from '@cosmjs/proto-signing';
 import { Account, StdFee } from '@cosmjs/stargate';
 import { Method } from '@cosmjs/tendermint-rpc';
 import { BroadcastTxSyncResponse } from '@cosmjs/tendermint-rpc/build/tendermint37';
-import { MsgVote } from '@dydxprotocol/v4-proto/src/codegen/cosmos/gov/v1/tx';
 import {
-    CompositeClient,
-    LocalWallet as LocalWalletType,
-    TransactionOptions,
-    VoteOption,
+  CompositeClient,
+  LocalWallet as LocalWalletType,
+  TransactionOptions,
+  VoteOption,
 } from '@nemo-network/v4-client-js/src';
+import { MsgVote } from '@nemo-network/v4-proto/src/codegen/cosmos/gov/v1/tx';
 import { spawn } from 'child_process';
 import * as fs from 'fs';
 import Long from 'long';

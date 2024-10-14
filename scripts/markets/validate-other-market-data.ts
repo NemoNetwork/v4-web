@@ -8,15 +8,15 @@
 
 /* eslint-disable no-await-in-loop */
 import { StdFee } from '@cosmjs/stargate';
-import { ClobPair } from '@dydxprotocol/v4-proto/src/codegen/dydxprotocol/clob/clob_pair';
-import { Perpetual } from '@dydxprotocol/v4-proto/src/codegen/dydxprotocol/perpetuals/perpetual';
-import { MarketPrice } from '@dydxprotocol/v4-proto/src/codegen/dydxprotocol/prices/market_price';
 import {
-    CompositeClient,
-    LocalWallet as LocalWalletType,
-    Network,
-    ProposalStatus,
+  CompositeClient,
+  LocalWallet as LocalWalletType,
+  Network,
+  ProposalStatus,
 } from '@nemo-network/v4-client-js/src';
+import { ClobPair } from '@nemo-network/v4-proto/src/codegen/nemo_network/clob/clob_pair';
+import { Perpetual } from '@nemo-network/v4-proto/src/codegen/nemo_network/perpetuals/perpetual';
+import { MarketPrice } from '@nemo-network/v4-proto/src/codegen/nemo_network/prices/market_price';
 import Ajv from 'ajv';
 import axios from 'axios';
 import { readFileSync } from 'fs';
@@ -24,14 +24,14 @@ import Long from 'long';
 import { PrometheusDriver } from 'prometheus-query';
 
 import {
-    createAndSendMarketMapProposal,
-    Exchange,
-    ExchangeName,
-    PerpetualMarketType,
-    Proposal,
-    retry,
-    sleep,
-    voteOnProposals,
+  createAndSendMarketMapProposal,
+  Exchange,
+  ExchangeName,
+  PerpetualMarketType,
+  Proposal,
+  retry,
+  sleep,
+  voteOnProposals,
 } from './help';
 
 const LocalWalletModule = await import(
