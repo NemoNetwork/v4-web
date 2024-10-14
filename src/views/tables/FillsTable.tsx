@@ -1,7 +1,7 @@
 import { Key, useEffect, useMemo } from 'react';
 
 import { Nullable } from '@dydxprotocol/v4-abacus';
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide } from '@nemo-network/v4-client-js/src';
 import type { ColumnSize } from '@react-types/table';
 import { shallowEqual } from 'react-redux';
 import styled, { css } from 'styled-components';

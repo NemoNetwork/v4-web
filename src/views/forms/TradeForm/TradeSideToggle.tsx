@@ -1,6 +1,6 @@
 import { memo } from 'react';
 
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide } from '@nemo-network/v4-client-js/src';
 import { shallowEqual } from 'react-redux';
 import styled, { css } from 'styled-components';
 

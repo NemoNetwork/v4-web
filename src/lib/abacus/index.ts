@@ -1,64 +1,64 @@
 // eslint-disable-next-line import/no-cycle
-import type { LocalWallet, SelectedGasDenom } from '@dydxprotocol/v4-client-js';
+import type { LocalWallet, SelectedGasDenom } from '@nemo-network/v4-client-js/src';
 
 import type {
-  AdjustIsolatedMarginInputFields,
-  ClosePositionInputFields,
-  HistoricalPnlPeriods,
-  HistoricalTradingRewardsPeriod,
-  HistoricalTradingRewardsPeriods,
-  HumanReadableCancelOrderPayload,
-  HumanReadableCloseAllPositionsPayload,
-  HumanReadablePlaceOrderPayload,
-  HumanReadableSubaccountTransferPayload,
-  HumanReadableTriggerOrdersPayload,
-  Nullable,
-  OrderbookGroupings,
-  ParsingError,
-  TradeInputFields,
-  TransferInputFields,
-  TriggerOrdersInputFields,
+    AdjustIsolatedMarginInputFields,
+    ClosePositionInputFields,
+    HistoricalPnlPeriods,
+    HistoricalTradingRewardsPeriod,
+    HistoricalTradingRewardsPeriods,
+    HumanReadableCancelOrderPayload,
+    HumanReadableCloseAllPositionsPayload,
+    HumanReadablePlaceOrderPayload,
+    HumanReadableSubaccountTransferPayload,
+    HumanReadableTriggerOrdersPayload,
+    Nullable,
+    OrderbookGroupings,
+    ParsingError,
+    TradeInputFields,
+    TransferInputFields,
+    TriggerOrdersInputFields,
 } from '@/constants/abacus';
 import {
-  AbacusAppConfig,
-  AbacusHelper,
-  AbacusWalletConnectionType,
-  AdjustIsolatedMarginInputField,
-  ApiData,
-  AsyncAbacusStateManager,
-  ClosePositionInputField,
-  ComplianceAction,
-  CoroutineTimer,
-  HistoricalPnlPeriod,
-  IOImplementations,
-  StatsigConfig,
-  TradeInputField,
-  TransferInputField,
-  TransferType,
-  TriggerOrdersInputField,
-  UIImplementations,
+    AbacusAppConfig,
+    AbacusHelper,
+    AbacusWalletConnectionType,
+    AdjustIsolatedMarginInputField,
+    ApiData,
+    AsyncAbacusStateManager,
+    ClosePositionInputField,
+    ComplianceAction,
+    CoroutineTimer,
+    HistoricalPnlPeriod,
+    IOImplementations,
+    StatsigConfig,
+    TradeInputField,
+    TransferInputField,
+    TransferType,
+    TriggerOrdersInputField,
+    UIImplementations,
 } from '@/constants/abacus';
 import { Hdkey } from '@/constants/account';
 import { DEFAULT_MARKETID } from '@/constants/markets';
 import { CURRENT_ABACUS_DEPLOYMENT, type DydxNetwork } from '@/constants/networks';
 import { StatsigFlags } from '@/constants/statsig';
 import {
-  CLEARED_CLOSE_POSITION_INPUTS,
-  CLEARED_SIZE_INPUTS,
-  CLEARED_TRADE_INPUTS,
+    CLEARED_CLOSE_POSITION_INPUTS,
+    CLEARED_SIZE_INPUTS,
+    CLEARED_TRADE_INPUTS,
 } from '@/constants/trade';
 import {
-  CLEARED_TRIGGER_LIMIT_INPUTS,
-  CLEARED_TRIGGER_ORDER_INPUTS,
-  TriggerFields,
+    CLEARED_TRIGGER_LIMIT_INPUTS,
+    CLEARED_TRIGGER_ORDER_INPUTS,
+    TriggerFields,
 } from '@/constants/triggers';
 import { ConnectorType, WalletInfo } from '@/constants/wallets';
 
 import { type RootStore } from '@/state/_store';
 import {
-  setClosePositionFormInputs,
-  setTradeFormInputs,
-  setTriggerFormInputs,
+    setClosePositionFormInputs,
+    setTradeFormInputs,
+    setTriggerFormInputs,
 } from '@/state/inputs';
 import { getInputTradeOptions, getTransferInputs } from '@/state/inputsSelectors';
 

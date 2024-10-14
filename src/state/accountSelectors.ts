@@ -1,18 +1,18 @@
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide } from '@nemo-network/v4-client-js/src';
 import BigNumber from 'bignumber.js';
 import { groupBy, sum } from 'lodash';
 
 import {
-  AbacusMarginMode,
-  AbacusOrderSide,
-  AbacusOrderStatus,
-  AbacusPositionSide,
-  HistoricalTradingRewardsPeriod,
-  ORDER_SIDES,
-  type AbacusOrderStatuses,
-  type SubaccountFill,
-  type SubaccountFundingPayment,
-  type SubaccountOrder,
+    AbacusMarginMode,
+    AbacusOrderSide,
+    AbacusOrderStatus,
+    AbacusPositionSide,
+    HistoricalTradingRewardsPeriod,
+    ORDER_SIDES,
+    type AbacusOrderStatuses,
+    type SubaccountFill,
+    type SubaccountFundingPayment,
+    type SubaccountOrder,
 } from '@/constants/abacus';
 import { NUM_PARENT_SUBACCOUNTS, OnboardingState } from '@/constants/account';
 import { LEVERAGE_DECIMALS } from '@/constants/numbers';
@@ -20,12 +20,12 @@ import { EMPTY_ARR } from '@/constants/objects';
 
 import { MustBigNumber } from '@/lib/numbers';
 import {
-  getAverageFillPrice,
-  getHydratedTradingData,
-  isOrderStatusClearable,
-  isOrderStatusOpen,
-  isStopLossOrder,
-  isTakeProfitOrder,
+    getAverageFillPrice,
+    getHydratedTradingData,
+    isOrderStatusClearable,
+    isOrderStatusOpen,
+    isStopLossOrder,
+    isTakeProfitOrder,
 } from '@/lib/orders';
 import { getHydratedPositionData } from '@/lib/positions';
 
@@ -33,9 +33,9 @@ import { type RootState } from './_store';
 import { createAppSelector } from './appTypes';
 import { getAssets } from './assetsSelectors';
 import {
-  getCurrentMarketId,
-  getCurrentMarketOrderbook,
-  getPerpetualMarkets,
+    getCurrentMarketId,
+    getCurrentMarketOrderbook,
+    getPerpetualMarkets,
 } from './perpetualsSelectors';
 
 /**

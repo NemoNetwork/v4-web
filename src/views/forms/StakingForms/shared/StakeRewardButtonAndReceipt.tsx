@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { SelectedGasDenom } from '@dydxprotocol/v4-client-js';
+import { SelectedGasDenom } from '@nemo-network/v4-client-js/src';
 import { shallowEqual } from 'react-redux';
 import styled, { css } from 'styled-components';
 import tw from 'twin.macro';

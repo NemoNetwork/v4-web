@@ -1,4 +1,4 @@
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide } from '@nemo-network/v4-client-js/src';
 
 import { AbacusOrderSide, type AbacusOrderSides, type Nullable } from '@/constants/abacus';
 

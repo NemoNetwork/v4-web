@@ -1,8 +1,8 @@
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide } from '@nemo-network/v4-client-js/src';
 import {
-  ChartPropertiesOverrides,
-  TradingTerminalFeatureset,
-  TradingTerminalWidgetOptions,
+    ChartPropertiesOverrides,
+    TradingTerminalFeatureset,
+    TradingTerminalWidgetOptions,
 } from 'public/tradingview/charting_library';
 
 import { MetadataServiceCandlesResponse } from '@/constants/assetMetadata';

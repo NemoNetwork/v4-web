@@ -19,7 +19,7 @@ export const useReferredBy = () => {
     try {
       const affliateAddress = await getReferredBy(address);
 
-      return { affiliateAddress: affliateAddress?.affiliateAddress };
+      return { affiliateAddress: affliateAddress };
     } catch (error) {
       log('useReferredBy', error);
       throw error;

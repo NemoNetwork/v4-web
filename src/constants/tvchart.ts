@@ -1,8 +1,8 @@
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide } from '@nemo-network/v4-client-js/src';
 import type {
-  IChartingLibraryWidget,
-  IOrderLineAdapter,
-  IPositionLineAdapter,
+    IChartingLibraryWidget,
+    IOrderLineAdapter,
+    IPositionLineAdapter,
 } from 'public/tradingview/charting_library';
 
 export type TvWidget = IChartingLibraryWidget & { _id?: string; _ready?: boolean };

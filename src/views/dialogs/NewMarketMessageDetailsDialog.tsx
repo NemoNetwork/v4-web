@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 
-import { utils } from '@dydxprotocol/v4-client-js';
+import { utils } from '@nemo-network/v4-client-js/src';
 import styled from 'styled-components';
 
 import { DialogProps, NewMarketMessageDetailsDialogProps } from '@/constants/dialogs';

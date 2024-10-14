@@ -9,7 +9,7 @@ import {
   utils,
   type GovAddNewMarketParams,
   type LocalWallet,
-} from '@dydxprotocol/v4-client-js';
+} from '@nemo-network/v4-client-js/src';
 import { useMutation } from '@tanstack/react-query';
 import Long from 'long';
 import { shallowEqual } from 'react-redux';
@@ -923,16 +923,20 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
       if (affiliate === subaccountClient?.wallet?.address) {
         throw new Error('affiliate can not be the same as referree');
       }
-      try {
-        const response = await compositeClient?.validatorClient.post.registerAffiliate(
-          subaccountClient,
-          affiliate
-        );
-        return response;
-      } catch (error) {
-        log('useSubaccount/registerAffiliate', error);
-        throw error;
-      }
+
+      var error = new Error('affiliate can not be the same as referree')
+      log('useSubaccount/registerAffiliate', error);
+      throw error;
+      // try {
+      //   const response = await compositeClient?.validatorClient.post.registerAffiliate(
+      //     subaccountClient,
+      //     affiliate
+      //   );
+      //   return response;
+      // } catch (error) {
+      //   log('useSubaccount/registerAffiliate', error);
+      //   throw error;
+      // }
     },
     [subaccountClient, compositeClient]
   );
@@ -1018,12 +1022,17 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
       if (subaccountClient == null) {
         throw new Error('local wallet client not initialized');
       }
-      return compositeClient.withdrawFromMegavault(
-        subaccountClient,
-        shares,
-        minAmount,
-        Method.BroadcastTxCommit
-      );
+      
+      var error = new Error('local wallet client not initialized')
+      log('useSubaccount/withdrawFromMegavault', error);
+      throw error;
+
+      // return compositeClient.withdrawFromMegavault(
+      //   subaccountClient,
+      //   shares,
+      //   minAmount,
+      //   Method.BroadcastTxCommit
+      // );
     },
     [compositeClient, subaccountClient]
   );

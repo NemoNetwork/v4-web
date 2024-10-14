@@ -29,7 +29,7 @@ export const useAffiliatesInfo = (dydxAddress?: string) => {
       const affiliateInfo = await getAffiliateInfo(dydxAddress);
 
       const data: AffiliatesMetadata | undefined = await response.json();
-      const isEligible = Boolean(data?.isVolumeEligible) || Boolean(affiliateInfo?.isWhitelisted);
+      const isEligible = Boolean(data?.isVolumeEligible);// || Boolean(affiliateInfo?.isWhitelisted);
 
       return { metadata: data, affiliateInfo, isEligible };
     } catch (error) {

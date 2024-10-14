@@ -2,7 +2,7 @@
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { calculateFee, GasPrice, MsgTransferEncodeObject } from '@cosmjs/stargate';
-import { GAS_MULTIPLIER } from '@dydxprotocol/v4-client-js';
+import { GAS_MULTIPLIER } from '@nemo-network/v4-client-js/src';
 import { useAccount as useAccountGraz, useStargateSigningClient } from 'graz';
 import { type NumberFormatValues } from 'react-number-format';
 import { shallowEqual } from 'react-redux';
@@ -14,31 +14,31 @@ import erc20_usdt from '@/abi/erc20_usdt.json';
 import { TransferInputField, TransferInputTokenResource, TransferType } from '@/constants/abacus';
 import { AlertType } from '@/constants/alerts';
 import {
-  AnalyticsEventPayloads,
-  AnalyticsEvents,
-  DEFAULT_TRANSACTION_MEMO,
+    AnalyticsEventPayloads,
+    AnalyticsEvents,
+    DEFAULT_TRANSACTION_MEMO,
 } from '@/constants/analytics';
 import { ButtonSize } from '@/constants/buttons';
 import { NEUTRON_USDC_IBC_DENOM, OSMO_USDC_IBC_DENOM } from '@/constants/denoms';
 import { DialogTypes } from '@/constants/dialogs';
 import {
-  getNeutronChainId,
-  getNobleChainId,
-  getOsmosisChainId,
-  NEUTRON_GAS_PRICE,
-  NOBLE_GAS_PRICE,
-  OSMO_GAS_PRICE,
-  SUPPORTED_COSMOS_CHAINS,
+    getNeutronChainId,
+    getNobleChainId,
+    getOsmosisChainId,
+    NEUTRON_GAS_PRICE,
+    NOBLE_GAS_PRICE,
+    OSMO_GAS_PRICE,
+    SUPPORTED_COSMOS_CHAINS,
 } from '@/constants/graz';
 import { STRING_KEYS } from '@/constants/localization';
 import { isMainnet } from '@/constants/networks';
 import { TransferNotificationTypes } from '@/constants/notifications';
 import {
-  DEFAULT_GAS_LIMIT,
-  MAX_CCTP_TRANSFER_AMOUNT,
-  MAX_PRICE_IMPACT,
-  MIN_CCTP_TRANSFER_AMOUNT,
-  NumberSign,
+    DEFAULT_GAS_LIMIT,
+    MAX_CCTP_TRANSFER_AMOUNT,
+    MAX_PRICE_IMPACT,
+    MIN_CCTP_TRANSFER_AMOUNT,
+    NumberSign,
 } from '@/constants/numbers';
 import { AppRoute, BASE_ROUTE } from '@/constants/routes';
 import { ConnectorType, type EvmAddress, WalletNetworkType, WalletType } from '@/constants/wallets';

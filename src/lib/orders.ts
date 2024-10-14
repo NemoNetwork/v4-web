@@ -1,21 +1,21 @@
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide } from '@nemo-network/v4-client-js/src';
 import BigNumber from 'bignumber.js';
 
 import {
-  AbacusOrderSide,
-  AbacusOrderStatus,
-  AbacusOrderType,
-  AbacusOrderTypes,
-  KotlinIrEnumValues,
-  Nullable,
-  SubaccountFills,
-  TRADE_TYPES,
-  type Asset,
-  type OrderStatus,
-  type PerpetualMarket,
-  type SubaccountFill,
-  type SubaccountFundingPayment,
-  type SubaccountOrder,
+    AbacusOrderSide,
+    AbacusOrderStatus,
+    AbacusOrderType,
+    AbacusOrderTypes,
+    KotlinIrEnumValues,
+    Nullable,
+    SubaccountFills,
+    TRADE_TYPES,
+    type Asset,
+    type OrderStatus,
+    type PerpetualMarket,
+    type SubaccountFill,
+    type SubaccountFundingPayment,
+    type SubaccountOrder,
 } from '@/constants/abacus';
 
 import { IconName } from '@/components/Icon';

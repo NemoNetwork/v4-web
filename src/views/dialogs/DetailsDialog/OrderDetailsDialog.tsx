@@ -1,11 +1,11 @@
-import { OrderFlags, OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderFlags, OrderSide } from '@nemo-network/v4-client-js/src';
 import { shallowEqual } from 'react-redux';
 
 import {
-  AbacusMarginMode,
-  AbacusOrderStatus,
-  AbacusOrderTypes,
-  type Nullable,
+    AbacusMarginMode,
+    AbacusOrderStatus,
+    AbacusOrderTypes,
+    type Nullable,
 } from '@/constants/abacus';
 import { ButtonAction } from '@/constants/buttons';
 import { DialogProps, OrderDetailsDialogProps } from '@/constants/dialogs';

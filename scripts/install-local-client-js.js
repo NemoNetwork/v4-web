@@ -4,7 +4,7 @@ const clean = process.argv.includes('--clean');
 
 if (clean) {
   infoMessage('Running deep clean.');
-  nonFatalExec('pnpm remove @dydxprotocol/v4-client-js'); // remove v4-client-js from node_modules
+  nonFatalExec('pnpm remove @nemo-network/v4-client-js'); // remove v4-client-js from node_modules
 }
 
 infoMessage('Cleaning up any previously built v4-client-js packages...');

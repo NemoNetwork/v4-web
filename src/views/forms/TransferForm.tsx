@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 
-import { validation } from '@dydxprotocol/v4-client-js';
+import { validation } from '@nemo-network/v4-client-js/src';
 import { noop } from 'lodash';
 import { type NumberFormatValues } from 'react-number-format';
 import type { SyntheticInputEvent } from 'react-number-format/types/types';

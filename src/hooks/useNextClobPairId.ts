@@ -1,17 +1,17 @@
 import { useCallback, useMemo } from 'react';
 
 import {
-  MsgCreateClobPair,
-  MsgCreateOracleMarket,
-  MsgCreatePerpetual,
-  MsgDelayMessage,
-  MsgUpdateClobPair,
-  TYPE_URL_MSG_CREATE_CLOB_PAIR,
-  TYPE_URL_MSG_CREATE_ORACLE_MARKET,
-  TYPE_URL_MSG_CREATE_PERPETUAL,
-  TYPE_URL_MSG_DELAY_MESSAGE,
-  TYPE_URL_MSG_UPDATE_CLOB_PAIR,
-} from '@dydxprotocol/v4-client-js';
+    MsgCreateClobPair,
+    MsgCreateOracleMarket,
+    MsgCreatePerpetual,
+    MsgDelayMessage,
+    MsgUpdateClobPair,
+    TYPE_URL_MSG_CREATE_CLOB_PAIR,
+    TYPE_URL_MSG_CREATE_ORACLE_MARKET,
+    TYPE_URL_MSG_CREATE_PERPETUAL,
+    TYPE_URL_MSG_DELAY_MESSAGE,
+    TYPE_URL_MSG_UPDATE_CLOB_PAIR,
+} from '@nemo-network/v4-client-js/src';
 import { useQuery } from '@tanstack/react-query';
 
 import type { PerpetualMarketResponse } from '@/constants/indexer';

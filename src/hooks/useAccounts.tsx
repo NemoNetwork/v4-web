@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import { LocalWallet, NOBLE_BECH32_PREFIX, type Subaccount } from '@dydxprotocol/v4-client-js';
+import { LocalWallet, NOBLE_BECH32_PREFIX, type Subaccount } from '@nemo-network/v4-client-js/src';
 import { usePrivy } from '@privy-io/react-auth';
 import { AES, enc } from 'crypto-js';
 
@@ -8,10 +8,10 @@ import { OnboardingGuard, OnboardingState } from '@/constants/account';
 import { getNobleChainId } from '@/constants/graz';
 import { LocalStorageKey } from '@/constants/localStorage';
 import {
-  ConnectorType,
-  DydxAddress,
-  PrivateInformation,
-  WalletNetworkType,
+    ConnectorType,
+    DydxAddress,
+    PrivateInformation,
+    WalletNetworkType,
 } from '@/constants/wallets';
 
 import { setOnboardingGuard, setOnboardingState } from '@/state/account';

@@ -8,15 +8,15 @@
 
 /* eslint-disable no-await-in-loop */
 import { StdFee } from '@cosmjs/stargate';
-import {
-  CompositeClient,
-  LocalWallet as LocalWalletType,
-  Network,
-  ProposalStatus,
-} from '@dydxprotocol/v4-client-js';
 import { ClobPair } from '@dydxprotocol/v4-proto/src/codegen/dydxprotocol/clob/clob_pair';
 import { Perpetual } from '@dydxprotocol/v4-proto/src/codegen/dydxprotocol/perpetuals/perpetual';
 import { MarketPrice } from '@dydxprotocol/v4-proto/src/codegen/dydxprotocol/prices/market_price';
+import {
+    CompositeClient,
+    LocalWallet as LocalWalletType,
+    Network,
+    ProposalStatus,
+} from '@nemo-network/v4-client-js/src';
 import Ajv from 'ajv';
 import axios from 'axios';
 import { readFileSync } from 'fs';
@@ -24,18 +24,18 @@ import Long from 'long';
 import { PrometheusDriver } from 'prometheus-query';
 
 import {
-  createAndSendMarketMapProposal,
-  Exchange,
-  ExchangeName,
-  PerpetualMarketType,
-  Proposal,
-  retry,
-  sleep,
-  voteOnProposals,
+    createAndSendMarketMapProposal,
+    Exchange,
+    ExchangeName,
+    PerpetualMarketType,
+    Proposal,
+    retry,
+    sleep,
+    voteOnProposals,
 } from './help';
 
 const LocalWalletModule = await import(
-  '@dydxprotocol/v4-client-js/src/clients/modules/local-wallet'
+  '@nemo-network/v4-client-js/src/clients/modules/local-wallet'
 );
 const LocalWallet = LocalWalletModule.default;
 

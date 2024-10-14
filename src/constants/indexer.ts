@@ -1,6 +1,6 @@
 /**
  * Temporary Indexer types
- * remove when Indexer type lib is available through @dydxprotocol/v4-client-js
+ * remove when Indexer type lib is available through @nemo-network/v4-client-js
  */
 export type PerpetualMarketResponse = {
   clobPairId: string;

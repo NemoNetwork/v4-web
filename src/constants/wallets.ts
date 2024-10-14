@@ -1,18 +1,18 @@
-import { type onboarding } from '@dydxprotocol/v4-client-js';
+import { type onboarding } from '@nemo-network/v4-client-js/src';
 import { WalletType as CosmosWalletType } from 'graz';
 import { EIP6963ProviderInfo } from 'mipd';
 
 import { STRING_KEYS } from '@/constants/localization';
 
 import {
-  CoinbaseIcon,
-  EmailIcon,
-  GenericWalletIcon,
-  KeplrIcon,
-  MetaMaskIcon,
-  OkxWalletIcon,
-  PhantomIcon,
-  WalletConnectIcon,
+    CoinbaseIcon,
+    EmailIcon,
+    GenericWalletIcon,
+    KeplrIcon,
+    MetaMaskIcon,
+    OkxWalletIcon,
+    PhantomIcon,
+    WalletConnectIcon,
 } from '@/icons';
 
 import { DydxChainId, WALLETS_CONFIG_MAP } from './networks';

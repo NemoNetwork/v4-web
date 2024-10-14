@@ -1,7 +1,7 @@
 import { Dispatch, SetStateAction, useMemo } from 'react';
 
-import { SelectedGasDenom } from '@dydxprotocol/v4-client-js';
 import { Validator } from '@dydxprotocol/v4-proto/src/codegen/cosmos/staking/v1beta1/staking';
+import { SelectedGasDenom } from '@nemo-network/v4-client-js/src';
 import BigNumber from 'bignumber.js';
 import { debounce } from 'lodash';
 import { NumberFormatValues } from 'react-number-format';
@@ -25,8 +25,8 @@ import { OutputType } from '@/components/Output';
 import { Tag } from '@/components/Tag';
 import { WithDetailsReceipt } from '@/components/WithDetailsReceipt';
 import {
-  StakeButtonAlert,
-  StakeRewardButtonAndReceipt,
+    StakeButtonAlert,
+    StakeRewardButtonAndReceipt,
 } from '@/views/forms/StakingForms/shared/StakeRewardButtonAndReceipt';
 
 import { track } from '@/lib/analytics/analytics';

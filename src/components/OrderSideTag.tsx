@@ -1,4 +1,4 @@
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide } from '@nemo-network/v4-client-js/src';
 
 import { STRING_KEYS } from '@/constants/localization';
 

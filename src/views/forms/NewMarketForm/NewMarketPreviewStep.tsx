@@ -1,8 +1,8 @@
 import { FormEvent, useMemo, useState } from 'react';
 
 import type { IndexedTx } from '@cosmjs/stargate';
-import { encodeJson } from '@dydxprotocol/v4-client-js';
 import { PerpetualMarketType } from '@dydxprotocol/v4-proto/src/codegen/dydxprotocol/perpetuals/perpetual';
+import { encodeJson } from '@nemo-network/v4-client-js/src';
 import Long from 'long';
 import styled from 'styled-components';
 import tw from 'twin.macro';

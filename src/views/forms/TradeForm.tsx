@@ -1,18 +1,18 @@
 import { useCallback, useMemo, useState, type FormEvent } from 'react';
 
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide } from '@nemo-network/v4-client-js/src';
 import { shallowEqual } from 'react-redux';
 import styled, { css } from 'styled-components';
 
 import {
-  AbacusInputTypes,
-  ComplianceStatus,
-  ErrorType,
-  TradeInputErrorAction,
-  TradeInputField,
-  ValidationError,
-  type HumanReadablePlaceOrderPayload,
-  type Nullable,
+    AbacusInputTypes,
+    ComplianceStatus,
+    ErrorType,
+    TradeInputErrorAction,
+    TradeInputField,
+    ValidationError,
+    type HumanReadablePlaceOrderPayload,
+    type Nullable,
 } from '@/constants/abacus';
 import { AlertType } from '@/constants/alerts';
 import { ButtonAction, ButtonShape, ButtonSize, ButtonType } from '@/constants/buttons';
@@ -42,10 +42,10 @@ import { ToggleGroup } from '@/components/ToggleGroup';
 
 import { useAppSelector } from '@/state/appTypes';
 import {
-  getCurrentInput,
-  getInputTradeData,
-  getTradeFormInputs,
-  useTradeFormData,
+    getCurrentInput,
+    getInputTradeData,
+    getTradeFormInputs,
+    useTradeFormData,
 } from '@/state/inputsSelectors';
 import { getCurrentMarketConfig } from '@/state/perpetualsSelectors';
 

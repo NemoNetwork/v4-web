@@ -12,7 +12,7 @@ import {
   ValidatorConfig,
   onboarding,
   type ProposalStatus,
-} from '@dydxprotocol/v4-client-js';
+} from '@nemo-network/v4-client-js/src';
 import type { ResolutionString } from 'public/tradingview/charting_library';
 
 import type { ConnectNetworkEvent, NetworkConfig } from '@/constants/abacus';
@@ -26,7 +26,6 @@ import { getSelectedNetwork } from '@/state/appSelectors';
 import { useAppSelector } from '@/state/appTypes';
 
 import abacusStateManager from '@/lib/abacus';
-import { parseToPrimitives } from '@/lib/abacus/parseToPrimitives';
 import { log } from '@/lib/telemetry';
 
 import { useEndpointsConfig } from './useEndpointsConfig';
@@ -220,18 +219,20 @@ const useDydxClientContext = () => {
 
   const getVaultWithdrawInfo = useCallback(
     async (shares: number) => {
-      try {
-        const result = await compositeClient?.validatorClient.get.getMegavaultWithdrawalInfo(
-          BigInt(shares)
-        );
-        if (result == null) {
-          return result;
-        }
-        return parseToPrimitives(result);
-      } catch (error) {
-        log('useDydxClient/getVaultWithdrawInfo', error);
-        return undefined;
-      }
+      return undefined;
+
+      // try {
+      //   const result = await compositeClient?.validatorClient.get.getMegavaultWithdrawalInfo(
+      //     BigInt(shares)
+      //   );
+      //   if (result == null) {
+      //     return result;
+      //   }
+      //   return parseToPrimitives(result);
+      // } catch (error) {
+      //   log('useDydxClient/getVaultWithdrawInfo', error);
+      //   return undefined;
+      // }
     },
     [compositeClient?.validatorClient.get]
   );
@@ -490,14 +491,15 @@ const useDydxClientContext = () => {
 
   const getAffiliateInfo = useCallback(
     async (address: string) => {
-      return compositeClient?.validatorClient.get.getAffiliateInfo(address);
+      return undefined; //compositeClient?.validatorClient.get.getAffiliateInfo(address);
     },
     [compositeClient]
   );
 
   const getReferredBy = useCallback(
     async (address: string) => {
-      return compositeClient?.validatorClient.get.getReferredBy(address);
+      return undefined; //
+      // return compositeClient?.validatorClient.get.getReferredBy(address);
     },
     [compositeClient]
   );

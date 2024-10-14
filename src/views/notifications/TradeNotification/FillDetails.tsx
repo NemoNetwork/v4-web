@@ -1,4 +1,4 @@
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide } from '@nemo-network/v4-client-js/src';
 import styled from 'styled-components';
 
 import { Nullable } from '@/constants/abacus';

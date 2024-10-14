@@ -1,6 +1,6 @@
 import { Key, ReactNode, useEffect, useMemo } from 'react';
 
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide } from '@nemo-network/v4-client-js/src';
 import { ColumnSize } from '@react-types/table';
 import type { Dispatch } from '@reduxjs/toolkit';
 import { shallowEqual } from 'react-redux';
@@ -36,9 +36,9 @@ import { MarketTypeFilter, marketTypeMatchesFilter } from '@/pages/trade/types';
 import { viewedOrders } from '@/state/account';
 import { calculateIsAccountViewOnly } from '@/state/accountCalculators';
 import {
-  getCurrentMarketOrders,
-  getHasUnseenOrderUpdates,
-  getSubaccountUnclearedOrders,
+    getCurrentMarketOrders,
+    getHasUnseenOrderUpdates,
+    getSubaccountUnclearedOrders,
 } from '@/state/accountSelectors';
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
 import { getAssets } from '@/state/assetsSelectors';
@@ -47,10 +47,10 @@ import { getPerpetualMarkets } from '@/state/perpetualsSelectors';
 
 import { MustBigNumber } from '@/lib/numbers';
 import {
-  getHydratedTradingData,
-  getOrderStatusInfo,
-  isMarketOrderType,
-  isOrderStatusClearable,
+    getHydratedTradingData,
+    getOrderStatusInfo,
+    isMarketOrderType,
+    isOrderStatusClearable,
 } from '@/lib/orders';
 import { getMarginModeFromSubaccountNumber } from '@/lib/tradeData';
 import { orEmptyRecord } from '@/lib/typeUtils';

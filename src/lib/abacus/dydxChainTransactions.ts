@@ -2,34 +2,34 @@ import { EncodeObject } from '@cosmjs/proto-signing';
 import { type IndexedTx } from '@cosmjs/stargate';
 import Abacus, { type Nullable } from '@dydxprotocol/v4-abacus';
 import {
-  CompositeClient,
-  GAS_MULTIPLIER,
-  IndexerConfig,
-  Network,
-  NetworkOptimizer,
-  NobleClient,
-  OrderExecution,
-  OrderSide,
-  OrderTimeInForce,
-  OrderType,
-  SubaccountClient,
-  ValidatorConfig,
-  encodeJson,
-  type LocalWallet,
-  type SelectedGasDenom,
-} from '@dydxprotocol/v4-client-js';
+    CompositeClient,
+    GAS_MULTIPLIER,
+    IndexerConfig,
+    Network,
+    NetworkOptimizer,
+    NobleClient,
+    OrderExecution,
+    OrderSide,
+    OrderTimeInForce,
+    OrderType,
+    SubaccountClient,
+    ValidatorConfig,
+    encodeJson,
+    type LocalWallet,
+    type SelectedGasDenom,
+} from '@nemo-network/v4-client-js/src';
 import Long from 'long';
 
 import {
-  QueryType,
-  QueryTypes,
-  TransactionType,
-  TransactionTypes,
-  type AbacusDYDXChainTransactionsProtocol,
-  type HumanReadableCancelOrderPayload,
-  type HumanReadablePlaceOrderPayload,
-  type HumanReadableTransferPayload,
-  type HumanReadableWithdrawPayload,
+    QueryType,
+    QueryTypes,
+    TransactionType,
+    TransactionTypes,
+    type AbacusDYDXChainTransactionsProtocol,
+    type HumanReadableCancelOrderPayload,
+    type HumanReadablePlaceOrderPayload,
+    type HumanReadableTransferPayload,
+    type HumanReadableWithdrawPayload,
 } from '@/constants/abacus';
 import { Hdkey } from '@/constants/account';
 import { DEFAULT_TRANSACTION_MEMO, TransactionMemo } from '@/constants/analytics';

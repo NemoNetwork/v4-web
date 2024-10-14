@@ -1,12 +1,12 @@
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide } from '@nemo-network/v4-client-js/src';
 import { shallowEqual } from 'react-redux';
 
 import {
-  AbacusOrderStatus,
-  AbacusOrderType,
-  KotlinIrEnumValues,
-  ORDER_STATUS_STRINGS,
-  TRADE_TYPES,
+    AbacusOrderStatus,
+    AbacusOrderType,
+    KotlinIrEnumValues,
+    ORDER_STATUS_STRINGS,
+    TRADE_TYPES,
 } from '@/constants/abacus';
 import { STRING_KEYS } from '@/constants/localization';
 import { USD_DECIMALS } from '@/constants/numbers';

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import { SelectedGasDenom } from '@dydxprotocol/v4-client-js';
+import { SelectedGasDenom } from '@nemo-network/v4-client-js/src';
 
 import { DialogProps, PreferencesDialogProps } from '@/constants/dialogs';
 import { TradeLayouts } from '@/constants/layout';

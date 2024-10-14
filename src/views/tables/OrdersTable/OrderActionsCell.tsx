@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 
 import { type Nullable } from '@dydxprotocol/v4-abacus';
-import { OrderFlags } from '@dydxprotocol/v4-client-js';
+import { OrderFlags } from '@nemo-network/v4-client-js/src';
 import styled from 'styled-components';
 
 import { AbacusOrderStatus, type OrderStatus } from '@/constants/abacus';

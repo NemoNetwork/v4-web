@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { kollections } from '@dydxprotocol/v4-abacus';
-import { MEGAVAULT_MODULE_ADDRESS } from '@dydxprotocol/v4-client-js';
+import { MEGAVAULT_MODULE_ADDRESS } from '@nemo-network/v4-client-js/src';
 import { UseQueryResult, useQuery } from '@tanstack/react-query';
 import { throttle } from 'lodash';
 
 import {
-  Nullable,
-  PerpetualMarket,
-  VaultAccountCalculator,
-  VaultCalculator,
-  VaultDepositWithdrawFormValidator,
-  VaultFormAccountData,
-  VaultFormAction,
-  VaultFormData,
+    Nullable,
+    PerpetualMarket,
+    VaultAccountCalculator,
+    VaultCalculator,
+    VaultDepositWithdrawFormValidator,
+    VaultFormAccountData,
+    VaultFormAction,
+    VaultFormData,
 } from '@/constants/abacus';
 import { AnalyticsEvents } from '@/constants/analytics';
 import { STRING_KEYS, StringGetterFunction } from '@/constants/localization';

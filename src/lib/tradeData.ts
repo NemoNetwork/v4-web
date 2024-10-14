@@ -1,17 +1,17 @@
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide } from '@nemo-network/v4-client-js/src';
 
 import {
-  AbacusMarginMode,
-  AbacusOrderSide,
-  AbacusOrderTypes,
-  ErrorFormat,
-  ErrorType,
-  ValidationError,
-  type AbacusOrderSides,
-  type ErrorFormatType,
-  type Nullable,
-  type SubaccountPosition,
-  type TradeState,
+    AbacusMarginMode,
+    AbacusOrderSide,
+    AbacusOrderTypes,
+    ErrorFormat,
+    ErrorType,
+    ValidationError,
+    type AbacusOrderSides,
+    type ErrorFormatType,
+    type Nullable,
+    type SubaccountPosition,
+    type TradeState,
 } from '@/constants/abacus';
 import { NUM_PARENT_SUBACCOUNTS } from '@/constants/account';
 import { AlertType } from '@/constants/alerts';

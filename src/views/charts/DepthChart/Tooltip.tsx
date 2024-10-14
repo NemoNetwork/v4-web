@@ -1,15 +1,15 @@
 import { useMemo } from 'react';
 
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide } from '@nemo-network/v4-client-js/src';
 import type { RenderTooltipParams } from '@visx/xychart/lib/components/Tooltip';
 import { shallowEqual } from 'react-redux';
 
 import type { Nullable } from '@/constants/abacus';
 import {
-  DepthChartDatum,
-  DepthChartPoint,
-  DepthChartSeries,
-  SERIES_KEY_FOR_ORDER_SIDE,
+    DepthChartDatum,
+    DepthChartPoint,
+    DepthChartSeries,
+    SERIES_KEY_FOR_ORDER_SIDE,
 } from '@/constants/charts';
 import { STRING_KEYS } from '@/constants/localization';
 

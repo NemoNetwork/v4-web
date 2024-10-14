@@ -1,28 +1,28 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide } from '@nemo-network/v4-client-js/src';
 import { curveStepAfter } from '@visx/curve';
 import { LinearGradient } from '@visx/gradient';
 import { Point } from '@visx/point';
 import {
-  AreaSeries,
-  Axis,
-  DataProvider,
-  EventEmitterProvider, // AnimatedAxis,
-  Grid, // AnimatedGrid,
-  LineSeries, // AnimatedAreaSeries,
-  buildChartTheme,
-  darkTheme,
-  type EventHandlerParams,
+    AreaSeries,
+    Axis,
+    DataProvider,
+    EventEmitterProvider, // AnimatedAxis,
+    Grid, // AnimatedGrid,
+    LineSeries, // AnimatedAreaSeries,
+    buildChartTheme,
+    darkTheme,
+    type EventHandlerParams,
 } from '@visx/xychart';
 import { shallowEqual } from 'react-redux';
 import styled, { keyframes } from 'styled-components';
 
 import {
-  DepthChartDatum,
-  DepthChartPoint,
-  DepthChartSeries,
-  SERIES_KEY_FOR_ORDER_SIDE,
+    DepthChartDatum,
+    DepthChartPoint,
+    DepthChartSeries,
+    SERIES_KEY_FOR_ORDER_SIDE,
 } from '@/constants/charts';
 import { StringGetterFunction } from '@/constants/localization';
 
