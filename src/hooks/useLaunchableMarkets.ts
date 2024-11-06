@@ -53,8 +53,8 @@ export const useMetadataService = () => {
             name: info[key].name,
             logo: info[key].logo,
             urls: {
-              website: info[key].urls.website,
-              technicalDoc: info[key].urls.technical_doc,
+              website: "",
+              technicalDoc: "",
               cmc: info[key].urls.cmc,
             },
             sectorTags: info[key].sector_tags,
