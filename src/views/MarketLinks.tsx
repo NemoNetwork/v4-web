@@ -25,17 +25,20 @@ export const MarketLinks = ({ launchableMarketId }: { launchableMarketId?: strin
   const linkItems = [
     {
       key: 'coinmarketcap',
-      href: urls?.cmc ?? coinMarketCapsLink,
+      // href: urls?.cmc ?? coinMarketCapsLink,
+      href: coinMarketCapsLink,
       icon: IconName.CoinMarketCap,
     },
     {
       key: 'whitepaper',
-      href: urls?.technicalDoc ?? whitepaperLink,
+      // href: urls?.technicalDoc ?? whitepaperLink,
+      href: whitepaperLink,
       icon: IconName.Whitepaper,
     },
     {
       key: 'project-website',
-      href: urls?.website ?? websiteLink,
+      // href: urls?.website ?? websiteLink,
+      href: websiteLink,
       icon: IconName.Website,
     },
   ].filter(({ href }) => href);

@@ -55,7 +55,8 @@ export const useMetadataService = () => {
             urls: {
               website: "",
               technicalDoc: "",
-              cmc: info[key].urls.cmc,
+              // cmc: info[key].urls.cmc,
+              cmc: "",
             },
             sectorTags: info[key].sector_tags,
             exchanges: info[key].exchanges,

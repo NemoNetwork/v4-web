@@ -52,7 +52,8 @@ export const LaunchableMarketChart = ({
   const launchableAsset = useMetadataServiceAssetFromId(ticker);
   const { id, marketCap, name, price, logo, reportedMarketCap, tickSizeDecimals, urls } =
     orEmptyObj(launchableAsset);
-  const cmcLink = urls?.cmc ?? undefined;
+  // const cmcLink = urls?.cmc ?? undefined;
+  const cmcLink = undefined;
   const candlesQuery = useMetadataServiceCandles(id, timeframe);
   const selectedLocale = useAppSelector(getSelectedLocale);
   const chartDotsBackground = useAppSelector(getChartDotBackground);
