@@ -93,7 +93,7 @@ export const ComplianceConfigDialog = ({ setIsOpen }: DialogProps<ComplianceConf
   const { compositeClient } = useDydxClient();
 
   const submit = async () => {
-    const endpoint = `${compositeClient?.indexerClient.config.restEndpoint}/v4/compliance/setStatus`;
+    const endpoint = `${compositeClient?.indexerClient.config.restEndpoint}/compliance/setStatus`;
     if (dydxAddress) {
       await fetch(endpoint, {
         method: 'POST',
