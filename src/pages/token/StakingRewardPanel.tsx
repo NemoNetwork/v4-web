@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 
-import { shallowEqual } from 'react-redux';
+import { BonsaiHooks } from '@/bonsai/ontology';
 import styled, { css } from 'styled-components';
 
 import { ButtonAction, ButtonSize } from '@/constants/buttons';
@@ -9,6 +9,7 @@ import { STRING_KEYS } from '@/constants/localization';
 import { SMALL_USD_DECIMALS } from '@/constants/numbers';
 
 import { useStringGetter } from '@/hooks/useStringGetter';
+import { useTokenConfigs } from '@/hooks/useTokenConfigs';
 
 import { layoutMixins } from '@/styles/layoutMixins';
 
@@ -18,9 +19,8 @@ import { Output, OutputType, ShowSign } from '@/components/Output';
 import { Panel } from '@/components/Panel';
 
 import { calculateCanAccountTrade } from '@/state/accountCalculators';
-import { getStakingRewards } from '@/state/accountSelectors';
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
-import { getChartDotBackground } from '@/state/configsSelectors';
+import { getChartDotBackground } from '@/state/appUiConfigsSelectors';
 import { openDialog } from '@/state/dialogs';
 
 import { BigNumberish } from '@/lib/numbers';
@@ -35,14 +35,13 @@ export const StakingRewardPanel = ({ usdcRewards }: ElementProps) => {
 
   const canAccountTrade = useAppSelector(calculateCanAccountTrade);
   const chartDotsBackground = useAppSelector(getChartDotBackground);
-  const { validators } = useAppSelector(getStakingRewards, shallowEqual) ?? {};
+  const { validators } = BonsaiHooks.useStakingRewards().data ?? {};
+  const { usdcImage } = useTokenConfigs();
 
   const openStakingRewardDialog = useCallback(
     () =>
       dispatch(
-        openDialog(
-          DialogTypes.StakingReward({ validators: validators?.toArray() ?? [], usdcRewards })
-        )
+        openDialog(DialogTypes.StakingReward({ validators: validators ?? [], usdcRewards }))
       ),
     [dispatch, validators, usdcRewards]
   );
@@ -77,7 +76,7 @@ export const StakingRewardPanel = ({ usdcRewards }: ElementProps) => {
           showSign={ShowSign.Both}
           minimumFractionDigits={SMALL_USD_DECIMALS}
         />
-        <AssetIcon symbol="USDC" />
+        <AssetIcon logoUrl={usdcImage} symbol="USDC" />
       </$InlineRow>
     </$Panel>
   );
@@ -116,10 +115,7 @@ const $InlineRow = styled.span`
   ${layoutMixins.inlineRow}
 
   height: 100%;
-
-  img {
-    font-size: 1.3rem;
-  }
+  --asset-icon-size: 1.3rem;
 `;
 
 const $PositiveOutput = styled(Output)`

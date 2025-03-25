@@ -1,8 +1,6 @@
 import { Nullable } from '@dydxprotocol/v4-abacus';
 import { OrderSide } from '@dydxprotocol/v4-client-js';
 
-import { FundingDirection } from './markets';
-
 export const TOGGLE_ACTIVE_CLASS_NAME = 'toggle-active';
 
 // ------ Depth Chart ------ //
@@ -32,6 +30,12 @@ export const SERIES_KEY_FOR_ORDER_SIDE = {
 };
 
 // ------ Funding Chart ------ //
+export enum FundingDirection {
+  ToShort = 'ToShort',
+  ToLong = 'ToLong',
+  None = 'None',
+}
+
 export enum FundingRateResolution {
   OneHour = 'OneHour',
   EightHour = 'EightHour',
@@ -49,6 +53,30 @@ export type TradingRewardsDatum = {
   date: number;
   cumulativeAmount: number;
 };
+
+export type AffiliatesProgramDatum = {
+  date: number;
+  cumulativeAmount: number;
+};
+
+export enum AffiliatesProgramPeriod {
+  Period1d = 'Period1d',
+  Period7d = 'Period7d',
+  Period30d = 'Period30d',
+  Period90d = 'Period90d',
+  PeriodAllTime = 'PeriodAllTime',
+}
+
+export enum AffiliatesProgramMetric {
+  ReferredVolume = 'referredVolume',
+  AffiliateEarnings = 'totalEarnings',
+  ReferredUsers = 'totalReferredUsers',
+  ReferredTrades = 'totalReferredTrades',
+}
+
+export const affiliatesProgramPeriods = Object.keys(
+  AffiliatesProgramPeriod
+) as AffiliatesProgramPeriod[];
 
 export enum TradingRewardsPeriod {
   Period1d = 'Period1d',

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import styled from 'styled-components';
+
 import { TradeLayouts } from '@/constants/layout';
 import { STRING_KEYS } from '@/constants/localization';
 import { ORDERBOOK_HEADER_HEIGHT, ORDERBOOK_ROW_HEIGHT } from '@/constants/orderbook';
@@ -9,8 +11,6 @@ import { useStringGetter } from '@/hooks/useStringGetter';
 import { Tabs } from '@/components/Tabs';
 import { CanvasOrderbook } from '@/views/CanvasOrderbook/CanvasOrderbook';
 import { LiveTrades } from '@/views/tables/LiveTrades';
-
-import { testFlags } from '@/lib/testFlags';
 
 enum Tab {
   Orderbook = 'Orderbook',
@@ -26,8 +26,6 @@ export const VerticalPanel = ({ tradeLayout }: { tradeLayout: TradeLayouts }) =>
   const stringGetter = useStringGetter();
   const [value, setValue] = useState(Tab.Orderbook);
   const [rowsPerSide, setRowsPerSide] = useState<number | undefined>(undefined);
-
-  const { uiRefresh } = testFlags;
 
   const canvasOrderbookRef = useRef<HTMLDivElement>(null);
   const canvasOrderbook = canvasOrderbookRef.current;
@@ -65,9 +63,9 @@ export const VerticalPanel = ({ tradeLayout }: { tradeLayout: TradeLayouts }) =>
   }, [calculateNumRows, canvasOrderbook]);
 
   return (
-    <Tabs
+    <$Tabs
       fullWidthTabs
-      dividerStyle={uiRefresh ? 'underline' : 'border'}
+      dividerStyle="underline"
       value={value}
       onValueChange={(v: Tab) => {
         setValue(v);
@@ -96,3 +94,7 @@ export const VerticalPanel = ({ tradeLayout }: { tradeLayout: TradeLayouts }) =>
     />
   );
 };
+
+const $Tabs = styled(Tabs)`
+  --trigger-active-underline-backgroundColor: var(--color-layer-2);
+` as typeof Tabs;

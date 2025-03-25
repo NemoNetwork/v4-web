@@ -1,38 +1,41 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
+import { SubaccountTransferPayload } from '@/bonsai/forms/adjustIsolatedMargin';
+import { TransferPayload, TransferToken } from '@/bonsai/forms/transfers';
+import {
+  CancelOrderPayload,
+  PlaceOrderPayload,
+  TriggerOrdersPayload,
+} from '@/bonsai/forms/triggers/types';
+import { parseTransactionError } from '@/bonsai/lib/extractErrors';
+import { wrapOperationFailure, wrapOperationSuccess } from '@/bonsai/lib/operationResult';
+import { logBonsaiError, logBonsaiInfo } from '@/bonsai/logs';
+import { BonsaiCore } from '@/bonsai/ontology';
 import type { EncodeObject } from '@cosmjs/proto-signing';
-import { type IndexedTx } from '@cosmjs/stargate';
+import { IndexedTx } from '@cosmjs/stargate';
 import { Method } from '@cosmjs/tendermint-rpc';
 import { type Nullable } from '@dydxprotocol/v4-abacus';
-import {
-  SubaccountClient,
-  utils,
-  type GovAddNewMarketParams,
-  type LocalWallet,
-} from '@dydxprotocol/v4-client-js';
+import { SubaccountClient, type LocalWallet } from '@dydxprotocol/v4-client-js';
 import { useMutation } from '@tanstack/react-query';
 import Long from 'long';
-import { shallowEqual } from 'react-redux';
 import { formatUnits, parseUnits } from 'viem';
 
 import type {
-  AccountBalance,
   HumanReadableCancelOrderPayload,
   HumanReadablePlaceOrderPayload,
   HumanReadableSubaccountTransferPayload,
-  HumanReadableTriggerOrdersPayload,
   ParsingError,
 } from '@/constants/abacus';
 import { AMOUNT_RESERVED_FOR_GAS_USDC, AMOUNT_USDC_BEFORE_REBALANCE } from '@/constants/account';
-import { DEFAULT_TRANSACTION_MEMO, TransactionMemo } from '@/constants/analytics';
+import { AnalyticsEvents, DEFAULT_TRANSACTION_MEMO, TransactionMemo } from '@/constants/analytics';
 import { DialogTypes } from '@/constants/dialogs';
-import { ErrorParams } from '@/constants/errors';
+import { DEFAULT_SOMETHING_WENT_WRONG_ERROR_PARAMS, ErrorParams } from '@/constants/errors';
 import { QUANTUM_MULTIPLIER } from '@/constants/numbers';
-import { TradeTypes } from '@/constants/trade';
+import { USDC_DECIMALS } from '@/constants/tokens';
+import { TradeTypes, UNCOMMITTED_ORDER_TIMEOUT_MS } from '@/constants/trade';
 import { DydxAddress, WalletType } from '@/constants/wallets';
 
 import { clearSubaccountState } from '@/state/account';
-import { getBalances, getSubaccountOrders } from '@/state/accountSelectors';
 import { removeLatestReferrer } from '@/state/affiliates';
 import { getLatestReferrer } from '@/state/affiliatesSelector';
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
@@ -46,18 +49,25 @@ import {
   closeAllPositionsSubmitted,
   placeOrderFailed,
   placeOrderSubmitted,
+  placeOrderTimeout,
 } from '@/state/localOrders';
 
 import abacusStateManager from '@/lib/abacus';
 import { parseToPrimitives } from '@/lib/abacus/parseToPrimitives';
-import { getValidErrorParamsFromParsingError } from '@/lib/errors';
+import { track } from '@/lib/analytics/analytics';
+import { assertNever } from '@/lib/assertNever';
+import {
+  getValidErrorParamsFromParsingError,
+  StatefulOrderError,
+  stringifyTransactionError,
+} from '@/lib/errors';
 import { isTruthy } from '@/lib/isTruthy';
+import { SerialTaskExecutor } from '@/lib/serialExecutor';
 import { log } from '@/lib/telemetry';
 import { hashFromTx } from '@/lib/txUtils';
 
 import { useAccounts } from './useAccounts';
 import { useDydxClient } from './useDydxClient';
-import { useGovernanceVariables } from './useGovernanceVariables';
 import { useReferredBy } from './useReferredBy';
 import { useTokenConfigs } from './useTokenConfigs';
 
@@ -74,6 +84,8 @@ export const SubaccountProvider = ({ ...props }) => {
 };
 
 export const useSubaccount = () => useContext(SubaccountContext);
+
+const chainTxExecutor = new SerialTaskExecutor();
 
 const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWallet }) => {
   const dispatch = useAppDispatch();
@@ -99,13 +111,7 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
     [faucetClient]
   );
 
-  const {
-    depositToSubaccount,
-    withdrawFromSubaccount,
-    transferFromSubaccountToAddress,
-    transferNativeToken,
-    sendSkipWithdrawFromSubaccount,
-  } = useMemo(
+  const { depositToSubaccount, withdrawFromSubaccount, sendSkipWithdrawFromSubaccount } = useMemo(
     () => ({
       depositToSubaccount: async ({
         subaccountClient,
@@ -126,6 +132,7 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
           throw error;
         }
       },
+
       withdrawFromSubaccount: async ({
         subaccountClient,
         amount,
@@ -137,82 +144,11 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
           return await compositeClient?.withdrawFromSubaccount(
             subaccountClient,
             amount.toFixed(usdcDecimals),
+            undefined,
             TransactionMemo.withdrawFromSubaccount
           );
         } catch (error) {
           log('useSubaccount/withdrawFromSubaccount', error);
-          throw error;
-        }
-      },
-      transferFromSubaccountToAddress: async ({
-        subaccountClient,
-        assetId = 0,
-        amount,
-        recipient,
-      }: {
-        subaccountClient: SubaccountClient;
-        assetId?: number;
-        amount: number;
-        recipient: string;
-      }) => {
-        try {
-          return await compositeClient?.validatorClient.post.send(
-            subaccountClient?.wallet,
-            () =>
-              new Promise((resolve) => {
-                const msg =
-                  compositeClient?.validatorClient.post.composer.composeMsgWithdrawFromSubaccount(
-                    subaccountClient.address,
-                    subaccountClient.subaccountNumber,
-                    assetId,
-                    Long.fromNumber(amount * QUANTUM_MULTIPLIER),
-                    recipient
-                  );
-
-                resolve([msg]);
-              }),
-            false,
-            undefined,
-            `${DEFAULT_TRANSACTION_MEMO} | transfer usdc to ${subaccountClient.address}`,
-            Method.BroadcastTxCommit
-          );
-        } catch (error) {
-          log('useSubaccount/transferFromSubaccountToAddress', error);
-          throw error;
-        }
-      },
-
-      transferNativeToken: async ({
-        subaccountClient,
-        amount,
-        recipient,
-        memo,
-      }: {
-        subaccountClient: SubaccountClient;
-        amount: number;
-        recipient: string;
-        memo?: string;
-      }) => {
-        try {
-          return await compositeClient?.validatorClient.post.send(
-            subaccountClient.wallet,
-            () =>
-              new Promise((resolve) => {
-                const msg = compositeClient?.sendTokenMessage(
-                  subaccountClient.wallet,
-                  amount.toString(),
-                  recipient
-                );
-
-                resolve([msg]);
-              }),
-            false,
-            compositeClient?.validatorClient?.post.defaultDydxGasPrice,
-            memo,
-            Method.BroadcastTxCommit
-          );
-        } catch (error) {
-          log('useSubaccount/transferNativeToken', error);
           throw error;
         }
       },
@@ -284,42 +220,15 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
   }, [dispatch, dydxAddress]);
 
   // ------ Deposit/Withdraw Methods ------ //
-  const rebalanceWalletFunds = useCallback(
-    async (balance: AccountBalance) => {
-      if (!subaccountClient) return;
-      const balanceAmount = parseFloat(balance.amount);
-      const shouldDeposit = balanceAmount - AMOUNT_RESERVED_FOR_GAS_USDC > 0;
-      const shouldWithdraw = balanceAmount - AMOUNT_USDC_BEFORE_REBALANCE <= 0;
-      if (shouldDeposit) {
-        await depositToSubaccount({
-          amount: balanceAmount - AMOUNT_RESERVED_FOR_GAS_USDC,
-          subaccountClient,
-        });
-      } else if (shouldWithdraw) {
-        await withdrawFromSubaccount({
-          amount: AMOUNT_RESERVED_FOR_GAS_USDC - balanceAmount,
-          subaccountClient,
-        });
-      }
-    },
-    [subaccountClient, depositToSubaccount, withdrawFromSubaccount]
-  );
-
-  const balances = useAppSelector(getBalances, shallowEqual);
-  const usdcCoinBalance = balances?.[usdcDenom];
-
-  useEffect(() => {
-    if (usdcCoinBalance && !isKeplr) {
-      rebalanceWalletFunds(usdcCoinBalance);
-    }
-  }, [usdcCoinBalance, rebalanceWalletFunds, isKeplr]);
+  const balances = useAppSelector(BonsaiCore.account.balances.data);
+  const usdcCoinBalance = balances.usdcAmount;
 
   const [showDepositDialog, setShowDepositDialog] = useState(true);
 
   useEffect(() => {
     if (isKeplr && usdcCoinBalance) {
       if (showDepositDialog) {
-        const balanceAmount = parseFloat(usdcCoinBalance.amount);
+        const balanceAmount = parseFloat(usdcCoinBalance);
         const usdcBalance = balanceAmount - AMOUNT_RESERVED_FOR_GAS_USDC;
         const shouldDeposit = usdcBalance > 0 && usdcBalance.toFixed(2) !== '0.00';
         if (shouldDeposit) {
@@ -334,7 +243,7 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
       }
       setShowDepositDialog(false);
     }
-  }, [isKeplr, usdcCoinBalance, showDepositDialog]);
+  }, [isKeplr, usdcCoinBalance, showDepositDialog, dispatch]);
 
   const deposit = useCallback(
     async (amount: number) => {
@@ -375,18 +284,6 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
   );
 
   // ------ Transfer Methods ------ //
-
-  const transfer = useCallback(
-    async (amount: number, recipient: string, coinDenom: string, memo?: string) => {
-      if (!subaccountClient) {
-        return undefined;
-      }
-      return (await (coinDenom === usdcDenom
-        ? transferFromSubaccountToAddress({ subaccountClient, amount, recipient })
-        : transferNativeToken({ subaccountClient, amount, recipient, memo }))) as IndexedTx;
-    },
-    [subaccountClient, transferFromSubaccountToAddress, transferNativeToken, usdcDenom]
-  );
 
   const sendSkipWithdraw = useCallback(
     async (amount: number, payload: string, isCctp?: boolean) => {
@@ -572,7 +469,7 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
     [dispatch]
   );
 
-  const orders = useAppSelector(getSubaccountOrders, shallowEqual);
+  const openOrders = useAppSelector(BonsaiCore.account.openOrders.data);
 
   // when marketId is provided, only cancel orders for that market, otherwise cancel globally
   const cancelAllOrders = useCallback(
@@ -583,7 +480,7 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
         parsingError?: Nullable<ParsingError>,
         data?: Nullable<HumanReadableCancelOrderPayload>
       ) => {
-        const matchedOrder = orders?.find((order) => order.id === data?.orderId);
+        const matchedOrder = openOrders.find((order) => order.id === data?.orderId);
         // ##OrderOnlyConfirmedCancelViaIndexer: success here does not necessarily mean orders are successfully canceled,
         // we use indexer response as source of truth on whether the order is actually canceled
         if (!success) {
@@ -603,7 +500,7 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
       dispatch(cancelAllSubmitted({ marketId, orderIds }));
       abacusStateManager.cancelAllOrders(marketId, callback);
     },
-    [dispatch, orders]
+    [dispatch, openOrders]
   );
 
   const closeAllPositions = useCallback(() => {
@@ -636,103 +533,219 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
     }
   }, [dispatch]);
 
-  // ------ Trigger Orders Methods ------ //
-  const placeTriggerOrders = useCallback(
-    async ({
-      onError,
-      onSuccess,
-    }: {
-      onError?: (onErrorParams: ErrorParams) => void;
-      onSuccess?: () => void;
-    } = {}) => {
-      const callback = (
-        success: boolean,
-        parsingError?: Nullable<ParsingError>,
-        data?: Nullable<HumanReadableTriggerOrdersPayload>
-      ) => {
-        const placeOrderPayloads = data?.placeOrderPayloads.toArray() ?? [];
-        const cancelOrderPayloads = data?.cancelOrderPayloads.toArray() ?? [];
-
-        if (success) {
-          // #OrderOnlyConfirmedCancelViaIndexer
-          // even though trigger orders are probably confirmed canceled, we use indexer as source of truth to trigger order status toast
-          onSuccess?.();
-        } else {
-          const errorParams = getValidErrorParamsFromParsingError(parsingError);
-          onError?.(errorParams);
-
-          placeOrderPayloads.forEach((payload: HumanReadablePlaceOrderPayload) => {
-            dispatch(
-              placeOrderFailed({
-                clientId: payload.clientId,
-                errorParams,
-              })
-            );
-          });
-
-          cancelOrderPayloads.forEach((payload: HumanReadableCancelOrderPayload) => {
-            dispatch(
-              cancelOrderFailed({
-                orderId: payload.orderId,
-                errorParams,
-              })
-            );
-          });
+  const doCancelOrder = useCallback(
+    async (payload: CancelOrderPayload) => {
+      try {
+        if (!compositeClient) {
+          throw new Error('client not initialized');
         }
-      };
+        if (!localDydxWallet) {
+          throw new Error('wallet not initialized');
+        }
 
-      const triggerOrderParams = abacusStateManager.triggerOrders(callback);
+        const {
+          subaccountNumber: subaccountNumberToUse,
+          clientId,
+          orderFlags,
+          clobPairId,
+          goodTilBlock,
+          goodTilBlockTime,
+        } = payload;
 
-      triggerOrderParams?.placeOrderPayloads
-        .toArray()
-        .forEach((payload: HumanReadablePlaceOrderPayload) => {
-          dispatch(
-            placeOrderSubmitted({
-              marketId: payload.marketId,
-              clientId: payload.clientId,
-              orderType: payload.type as TradeTypes,
-            })
-          );
+        const subaccountClientToUse = new SubaccountClient(localDydxWallet, subaccountNumberToUse);
+
+        const tx = await compositeClient.cancelRawOrder(
+          subaccountClientToUse,
+          clientId,
+          orderFlags,
+          clobPairId,
+          goodTilBlock === 0 ? undefined : goodTilBlock ?? undefined,
+          goodTilBlockTime === 0 ? undefined : goodTilBlockTime ?? undefined
+        );
+
+        const parsedTx = parseToPrimitives(tx);
+        logBonsaiInfo('useSubaccount/doCancelOrder', 'Successfully canceled order', {
+          payload,
+          parsedTx,
         });
-
-      triggerOrderParams?.cancelOrderPayloads
-        .toArray()
-        .forEach((payload: HumanReadableCancelOrderPayload) => {
-          dispatch(cancelOrderSubmitted(payload.orderId));
+        return wrapOperationSuccess(parsedTx);
+      } catch (error) {
+        const parsed = stringifyTransactionError(error);
+        logBonsaiError('useSubaccount/doCancelOrder', 'Failed to cancel order', {
+          payload,
+          parsed,
         });
-
-      return triggerOrderParams;
+        return wrapOperationFailure(parsed);
+      }
     },
-    [dispatch]
+    [compositeClient, localDydxWallet]
   );
 
-  const { newMarketProposal } = useGovernanceVariables();
+  const doPlaceOrder = useCallback(
+    async (params: PlaceOrderPayload) => {
+      try {
+        track(AnalyticsEvents.TradePlaceOrder(params as any)); // type is close enough but it's annoying to fully convert
 
-  // ------ Governance Methods ------ //
-  const submitNewMarketProposal = useCallback(
-    async (params: GovAddNewMarketParams) => {
+        if (!compositeClient) {
+          throw new Error('client not initialized');
+        }
+        if (!localDydxWallet) {
+          throw new Error('wallet not initialized');
+        }
+
+        const {
+          subaccountNumber: subaccountNumberToUse,
+          marketId,
+          type,
+          side,
+          price,
+          size,
+          clientId,
+          timeInForce,
+          goodTilTimeInSeconds,
+          goodTilBlock,
+          execution,
+          postOnly,
+          reduceOnly,
+          triggerPrice,
+          marketInfo,
+          currentHeight,
+        } = params;
+
+        // Set timeout for order to be considered failed if not committed
+        setTimeout(() => {
+          dispatch(placeOrderTimeout(clientId.toString()));
+        }, UNCOMMITTED_ORDER_TIMEOUT_MS);
+
+        const subaccountClientToUse = new SubaccountClient(localDydxWallet, subaccountNumberToUse);
+
+        // Place order
+        const tx = await compositeClient.placeOrder(
+          subaccountClientToUse,
+          marketId,
+          type,
+          side,
+          price,
+          size,
+          clientId,
+          timeInForce,
+          goodTilTimeInSeconds ?? 0,
+          execution,
+          postOnly ?? undefined,
+          reduceOnly ?? undefined,
+          triggerPrice ?? undefined,
+          marketInfo ?? undefined,
+          currentHeight ?? undefined,
+          goodTilBlock ?? undefined,
+          TransactionMemo.placeOrder
+        );
+
+        // Handle stateful orders
+        if ((tx as IndexedTx | undefined)?.code !== 0) {
+          throw new StatefulOrderError('Stateful order has failed to commit.', tx);
+        }
+
+        const parsedTx = parseToPrimitives(tx);
+
+        logBonsaiInfo('useSubaccount/doPlaceOrder', 'Successfully placed order', {
+          params,
+          parsedTx,
+        });
+
+        return wrapOperationSuccess(parsedTx);
+      } catch (error) {
+        const parsed = stringifyTransactionError(error);
+        // Don't log broadcast errors which are expected in some cases
+        logBonsaiError('useSubaccount/doPlaceOrder', 'Failed to place order', {
+          params,
+          parsed,
+        });
+
+        return wrapOperationFailure(parsed);
+      }
+    },
+    [compositeClient, localDydxWallet, dispatch]
+  );
+
+  // ------ Trigger Orders Methods ------ //
+  const placeTriggerOrders = useCallback(
+    async (payload: TriggerOrdersPayload) => {
+      const { placeOrderPayloads, cancelOrderPayloads } = payload;
+
+      const cancels = cancelOrderPayloads.map(async (cancelOrderPayload) => {
+        dispatch(cancelOrderSubmitted(cancelOrderPayload.orderId));
+
+        const res = await chainTxExecutor.enqueue(() => doCancelOrder(cancelOrderPayload));
+
+        if (res.type === 'failure') {
+          const parsed = parseTransactionError('placeTriggerOrders/cancelOrder', res.errorString);
+          dispatch(
+            cancelOrderFailed({
+              orderId: cancelOrderPayload.orderId,
+              errorParams:
+                parsed != null
+                  ? { errorMessage: parsed.message, errorStringKey: parsed.stringKey ?? undefined }
+                  : DEFAULT_SOMETHING_WENT_WRONG_ERROR_PARAMS,
+            })
+          );
+        }
+        return res;
+      });
+
+      const places = placeOrderPayloads.map(async (placeOrderPayload) => {
+        dispatch(
+          placeOrderSubmitted({
+            marketId: placeOrderPayload.marketId,
+            clientId: placeOrderPayload.clientId.toString(),
+            orderType: placeOrderPayload.type as unknown as TradeTypes,
+          })
+        );
+
+        const res = await chainTxExecutor.enqueue(() => doPlaceOrder(placeOrderPayload));
+
+        if (res.type === 'failure') {
+          const parsed = parseTransactionError('placeTriggerOrders/placeOrder', res.errorString);
+          dispatch(
+            placeOrderFailed({
+              clientId: placeOrderPayload.clientId.toString(),
+              errorParams:
+                parsed != null
+                  ? { errorMessage: parsed.message, errorStringKey: parsed.stringKey ?? undefined }
+                  : DEFAULT_SOMETHING_WENT_WRONG_ERROR_PARAMS,
+            })
+          );
+        }
+        return res;
+      });
+      const cancelResults = await Promise.all([...cancels, ...places]);
+      const placeResults = await Promise.all([...cancels, ...places]);
+      return { cancelResults, placeResults };
+    },
+    [dispatch, doCancelOrder, doPlaceOrder]
+  );
+
+  // ------ Listing Method ------ //
+  const createPermissionlessMarket = useCallback(
+    async (ticker: string) => {
       if (!compositeClient) {
         throw new Error('client not initialized');
-      } else if (!localDydxWallet) {
+      } else if (!subaccountClient?.address) {
         throw new Error('wallet not initialized');
-      } else if (!newMarketProposal) {
-        throw new Error('governance variables not initialized');
       }
 
-      const response = await compositeClient.submitGovAddNewMarketProposal(
-        localDydxWallet,
-        params,
-        utils.getGovAddNewMarketTitle(params.ticker),
-        utils.getGovAddNewMarketSummary(params.ticker, newMarketProposal.delayBlocks),
-        BigInt(newMarketProposal.initialDepositAmount).toString(),
+      track(AnalyticsEvents.LaunchMarketTransaction({ marketId: ticker }));
+
+      const response = await compositeClient.createMarketPermissionless(
+        subaccountClient,
+        ticker,
         undefined,
         undefined,
-        true
+        TransactionMemo.launchMarket
       );
 
       return response;
     },
-    [compositeClient, localDydxWallet, newMarketProposal]
+    [compositeClient, subaccountClient]
   );
 
   // ------ Staking Methods ------ //
@@ -741,15 +754,16 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
       if (!compositeClient) {
         throw new Error('client not initialized');
       }
-      if (!subaccountClient?.wallet?.address) {
+      if (!subaccountClient?.wallet.address) {
         throw new Error('wallet not initialized');
       }
 
-      const response = await compositeClient?.validatorClient.post.delegate(
+      const response = await compositeClient.validatorClient.post.delegate(
         subaccountClient,
-        subaccountClient.wallet?.address,
+        subaccountClient.wallet.address,
         validator,
-        parseUnits(amount.toString(), chainTokenDecimals).toString()
+        parseUnits(amount.toString(), chainTokenDecimals).toString(),
+        Method.BroadcastTxCommit
       );
 
       return response;
@@ -811,7 +825,9 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
         localDydxWallet,
         () => Promise.resolve(msgs),
         false,
-        compositeClient.validatorClient.post.defaultDydxGasPrice
+        compositeClient.validatorClient.post.defaultDydxGasPrice,
+        undefined,
+        Method.BroadcastTxCommit
       );
 
       return tx;
@@ -875,7 +891,9 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
         localDydxWallet,
         () => Promise.resolve(msgs),
         false,
-        compositeClient.validatorClient.post.defaultGasPrice
+        compositeClient.validatorClient.post.defaultGasPrice,
+        undefined,
+        Method.BroadcastTxCommit
       );
 
       return tx;
@@ -917,14 +935,14 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
       if (!compositeClient) {
         throw new Error('client not initialized');
       }
-      if (!subaccountClient?.wallet?.address) {
+      if (!subaccountClient?.wallet.address) {
         throw new Error('wallet not initialized');
       }
-      if (affiliate === subaccountClient?.wallet?.address) {
+      if (affiliate === subaccountClient.wallet.address) {
         throw new Error('affiliate can not be the same as referree');
       }
       try {
-        const response = await compositeClient?.validatorClient.post.registerAffiliate(
+        const response = await compositeClient.validatorClient.post.registerAffiliate(
           subaccountClient,
           affiliate
         );
@@ -942,9 +960,10 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
 
   const { mutateAsync: registerAffiliateMutate, isPending: isRegisterAffiliatePending } =
     useMutation({
-      mutationFn: async (affiliate: string) => {
-        const tx = await registerAffiliate(affiliate);
+      mutationFn: async (affiliateAddress: string) => {
+        const tx = await registerAffiliate(affiliateAddress);
         dispatch(removeLatestReferrer());
+        track(AnalyticsEvents.AffiliateRegistration({ affiliateAddress }));
         return tx;
       },
     });
@@ -957,10 +976,11 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
       return;
     }
     if (
+      compositeClient &&
       latestReferrer &&
       dydxAddress &&
       usdcCoinBalance &&
-      parseFloat(usdcCoinBalance.amount) > AMOUNT_USDC_BEFORE_REBALANCE &&
+      parseFloat(usdcCoinBalance) > AMOUNT_USDC_BEFORE_REBALANCE &&
       isReferredByFetched &&
       !referredBy?.affiliateAddress &&
       !isRegisterAffiliatePending
@@ -968,6 +988,7 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
       registerAffiliateMutate(latestReferrer);
     }
   }, [
+    compositeClient,
     latestReferrer,
     dydxAddress,
     registerAffiliateMutate,
@@ -989,7 +1010,7 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
     if (!compositeClient?.validatorClient) {
       throw new Error('client not initialized');
     }
-    const result = await compositeClient?.validatorClient.get.getMegavaultOwnerShares(dydxAddress);
+    const result = await compositeClient.validatorClient.get.getMegavaultOwnerShares(dydxAddress);
     if (result == null) {
       return result;
     }
@@ -1028,6 +1049,184 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
     [compositeClient, subaccountClient]
   );
 
+  const transferBetweenSubaccounts = useCallback(
+    async (params: SubaccountTransferPayload) => {
+      try {
+        const subaccount = localDydxWallet
+          ? new SubaccountClient(localDydxWallet, params.subaccountNumber)
+          : undefined;
+
+        if (subaccount == null) {
+          throw new Error('local wallet client not initialized');
+        }
+
+        if (!compositeClient) {
+          throw new Error('Missing compositeClient or localWallet');
+        }
+
+        if (params.senderAddress !== subaccount.address) {
+          throw new Error('Sender address does not match local wallet');
+        }
+
+        const tx = await compositeClient.transferToSubaccount(
+          subaccount,
+          params.destinationAddress,
+          params.destinationSubaccountNumber,
+          parseFloat(params.amount).toFixed(USDC_DECIMALS),
+          DEFAULT_TRANSACTION_MEMO
+        );
+
+        const parsedTx = parseToPrimitives(tx);
+        logBonsaiInfo('useSubaccount/subaccountTransfer', 'Successful subaccount transfer', {
+          parsedTx,
+        });
+        return wrapOperationSuccess(parsedTx);
+      } catch (error) {
+        const parsed = stringifyTransactionError(error);
+        logBonsaiError('useSubaccount/subaccountTransfer', 'Failed subaccount transfer', {
+          parsed,
+        });
+        return wrapOperationFailure(parsed);
+      }
+    },
+    [compositeClient, localDydxWallet]
+  );
+
+  const createTransferMessage = useCallback(
+    (payload: TransferPayload) => {
+      if (subaccountClient == null) {
+        throw new Error('local wallet client not initialized');
+      }
+
+      if (compositeClient == null) {
+        throw new Error('Missing compositeClient or localWallet');
+      }
+
+      if (payload.type === TransferToken.USDC) {
+        return compositeClient.validatorClient.post.composer.composeMsgWithdrawFromSubaccount(
+          subaccountClient.address,
+          subaccountClient.subaccountNumber,
+          0, // assetId default
+          Long.fromNumber(payload.amount * QUANTUM_MULTIPLIER),
+          payload.recipient
+        );
+      }
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (payload.type === TransferToken.NATIVE) {
+        return compositeClient.sendTokenMessage(
+          subaccountClient.wallet,
+          payload.amount.toString(),
+          payload.recipient
+        );
+      }
+      assertNever(payload);
+      return undefined;
+    },
+    [compositeClient, subaccountClient]
+  );
+
+  const simulateTransfer = useCallback(
+    async (payload: TransferPayload) => {
+      try {
+        if (subaccountClient == null) {
+          throw new Error('local wallet client not initialized');
+        }
+
+        if (compositeClient == null) {
+          throw new Error('Missing compositeClient or localWallet');
+        }
+
+        const gasPrice =
+          payload.type === TransferToken.USDC
+            ? undefined
+            : compositeClient.validatorClient.post.defaultDydxGasPrice;
+
+        const message = createTransferMessage(payload);
+
+        if (message == null) {
+          throw new Error('invalid message generated');
+        }
+
+        const tx = await compositeClient.simulate(
+          subaccountClient.wallet,
+          () => Promise.resolve([message]),
+          gasPrice
+        );
+
+        const parsedTx = parseToPrimitives(tx);
+        logBonsaiInfo('useSubaccount/simulateTransfer', 'Successful transfer simulation', {
+          payload,
+          parsedTx,
+        });
+        return wrapOperationSuccess(parsedTx);
+      } catch (error) {
+        const parsed = stringifyTransactionError(error);
+        logBonsaiError('useSubaccount/simulateTransfer', 'Failed transfer simulation', {
+          transferType: payload.type,
+          parsed,
+        });
+        return wrapOperationFailure(parsed);
+      }
+    },
+    [subaccountClient, compositeClient, createTransferMessage]
+  );
+
+  const transfer = useCallback(
+    async (payload: TransferPayload) => {
+      try {
+        if (subaccountClient == null) {
+          throw new Error('local wallet client not initialized');
+        }
+
+        if (compositeClient == null) {
+          throw new Error('Missing compositeClient or localWallet');
+        }
+
+        const transferMemo =
+          payload.type === TransferToken.USDC
+            ? `${DEFAULT_TRANSACTION_MEMO} | transfer usdc to ${subaccountClient.address}`
+            : payload.memo;
+
+        const gasPrice =
+          payload.type === TransferToken.USDC
+            ? undefined
+            : compositeClient.validatorClient.post.defaultDydxGasPrice;
+
+        const message = createTransferMessage(payload);
+
+        if (message == null) {
+          throw new Error('invalid message generated');
+        }
+
+        const result = await compositeClient.validatorClient.post.send(
+          subaccountClient.wallet,
+          () => Promise.resolve([message]),
+          false,
+          gasPrice,
+          transferMemo,
+          Method.BroadcastTxCommit
+        );
+
+        const parsedResult = parseToPrimitives(result);
+        logBonsaiInfo('useSubaccount/transfer', 'Successful transfer', {
+          transferType: payload.type,
+          parsedResult,
+        });
+
+        return wrapOperationSuccess(parsedResult);
+      } catch (error) {
+        const parsed = stringifyTransactionError(error);
+        logBonsaiError('useSubaccount/transfer', 'Failed transfer', {
+          transferType: payload.type,
+          parsed,
+        });
+
+        return wrapOperationFailure(parsed);
+      }
+    },
+    [subaccountClient, compositeClient, createTransferMessage]
+  );
+
   return {
     // Deposit/Withdraw/Faucet Methods
     deposit,
@@ -1036,9 +1235,11 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
 
     // Transfer Methods
     transfer,
+    simulateTransfer,
     sendSkipWithdraw,
     adjustIsolatedMarginOfPosition,
     depositCurrentBalance,
+    transferBetweenSubaccounts,
 
     // Trading Methods
     placeOrder,
@@ -1048,8 +1249,8 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
     cancelAllOrders,
     placeTriggerOrders,
 
-    // Governance Methods
-    submitNewMarketProposal,
+    // Listing Methods
+    createPermissionlessMarket,
 
     // Staking methods
     delegate,
@@ -1061,6 +1262,7 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
 
     // affiliates
     registerAffiliate,
+    referredBy: referredBy?.affiliateAddress,
 
     // vaults
     getVaultAccountInfo,

@@ -5,27 +5,27 @@ import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 
 import { AnalyticsEvents } from '@/constants/analytics';
-import { ButtonAction } from '@/constants/buttons';
 import { STRING_KEYS } from '@/constants/localization';
 import { AppRoute } from '@/constants/routes';
 import { ColorToken } from '@/constants/styles/base';
 
 import { useBreakpoints } from '@/hooks/useBreakpoints';
+import { useLocaleSeparators } from '@/hooks/useLocaleSeparators';
 import { useStringGetter } from '@/hooks/useStringGetter';
 import { useLoadedVaultAccount, useLoadedVaultDetails } from '@/hooks/vaultsHooks';
 
-import { Button } from '@/components/Button';
-import { Output, OutputType } from '@/components/Output';
-import { NewTag, Tag, TagSign, TagType } from '@/components/Tag';
+import { Link } from '@/components/Link';
+import { Output, OutputType, formatNumberOutput } from '@/components/Output';
+import { Tag, TagSign, TagType } from '@/components/Tag';
 import { WithLabel } from '@/components/WithLabel';
+import { WithTooltip } from '@/components/WithTooltip';
 
 import { getSubaccount } from '@/state/accountSelectors';
 import { useAppSelector } from '@/state/appTypes';
+import { getSelectedLocale } from '@/state/localizationSelectors';
 
 import { track } from '@/lib/analytics/analytics';
 import { mapIfPresent } from '@/lib/do';
-import { isTruthy } from '@/lib/isTruthy';
-import { testFlags } from '@/lib/testFlags';
 import { orEmptyObj } from '@/lib/typeUtils';
 
 const EMBARRASSING_APR_THRESHOLD = 0.02;
@@ -33,11 +33,12 @@ const EMBARRASSING_APR_THRESHOLD = 0.02;
 export const MegavaultYieldTag = () => {
   const stringGetter = useStringGetter();
   const vault = useLoadedVaultDetails().data;
+
   if (
     vault?.thirtyDayReturnPercent == null ||
     vault.thirtyDayReturnPercent < EMBARRASSING_APR_THRESHOLD
   ) {
-    return <NewTag>{stringGetter({ key: STRING_KEYS.NEW })}</NewTag>;
+    return null;
   }
 
   return (
@@ -46,7 +47,12 @@ export const MegavaultYieldTag = () => {
         key: STRING_KEYS.APR,
         params: {
           PERCENT: (
-            <Output tw="mr-0.25" type={OutputType.Percent} value={vault?.thirtyDayReturnPercent} />
+            <Output
+              tw="mr-0.25"
+              type={OutputType.Percent}
+              value={vault.thirtyDayReturnPercent}
+              fractionDigits={0}
+            />
           ),
         },
       })}
@@ -60,7 +66,7 @@ export const AccountOverviewSection = () => {
 
   const { equity, freeCollateral } = orEmptyObj(useAppSelector(getSubaccount, shallowEqual));
   const { balanceUsdc: vaultBalance } = orEmptyObj(useLoadedVaultAccount().data);
-  const totalValue = mapIfPresent(equity?.current, (e) => e + (vaultBalance ?? 0));
+  const totalValue = mapIfPresent(equity?.toNumber(), (e) => e + (vaultBalance ?? 0));
 
   const handleViewVault = useCallback(() => {
     track(AnalyticsEvents.ClickViewVaultFromOverview());
@@ -69,29 +75,38 @@ export const AccountOverviewSection = () => {
     });
   }, [navigate]);
 
-  const showVaults = testFlags.enableVaults;
   const { isTablet } = useBreakpoints();
 
   const pieSections = [
     {
       id: 'free-collateral',
       label: stringGetter({ key: STRING_KEYS.FREE_COLLATERAL }),
-      amount: freeCollateral?.current,
+      amount: mapIfPresent(freeCollateral?.toNumber(), (fc) => Math.max(fc, 0.0)),
       color: ColorToken.GrayPurple2,
     },
     {
       id: 'open-positions',
       label: stringGetter({ key: STRING_KEYS.POSITION_MARGIN }),
-      amount: mapIfPresent(equity?.current, freeCollateral?.current, (e, f) => e - f),
-      color: ColorToken.Green2,
+      amount: mapIfPresent(equity?.toNumber(), freeCollateral?.toNumber(), (e, f) =>
+        Math.max(e - Math.max(f, 0), 0)
+      ),
+      color: ColorToken.Yellow1,
     },
-    (showVaults || (vaultBalance ?? 0) > 0.01) && {
+    {
       id: 'megavault',
-      label: stringGetter({ key: STRING_KEYS.MEGAVAULT }),
+      label: (
+        <Link onClick={() => handleViewVault()} tw="text-color-text-0 underline">
+          {stringGetter({ key: STRING_KEYS.MEGAVAULT })}
+        </Link>
+      ),
+      labelString: stringGetter({ key: STRING_KEYS.MEGAVAULT }),
       amount: vaultBalance,
       color: ColorToken.Purple1,
     },
-  ].filter(isTruthy);
+  ];
+
+  const { decimal: decimalSeparator, group: groupSeparator } = useLocaleSeparators();
+  const selectedLocale = useAppSelector(getSelectedLocale);
 
   return (
     <$AccountOverviewWrapper>
@@ -99,12 +114,6 @@ export const AccountOverviewSection = () => {
         <$WithLabel label={stringGetter({ key: STRING_KEYS.PORTFOLIO_VALUE })}>
           <Output tw="font-extra-book" type={OutputType.Fiat} value={totalValue} />
         </$WithLabel>
-        {showVaults && (
-          <Button action={ButtonAction.Base} onClick={handleViewVault}>
-            {stringGetter({ key: STRING_KEYS.VIEW_MEGAVAULT })}
-            <MegavaultYieldTag />
-          </Button>
-        )}
       </div>
       <div tw="row w-full gap-1 p-1">
         <div tw="row gap-2">
@@ -123,25 +132,46 @@ export const AccountOverviewSection = () => {
         {!isTablet && (
           <div tw="flexColumn flex-1 pt-0.5">
             <div tw="row h-1 w-full overflow-hidden rounded-1">
-              {pieSections.map(
-                (section) =>
-                  section.amount != null &&
-                  totalValue != null &&
-                  section.amount > 0 && (
-                    <$LineSegment
-                      key={section.id}
-                      tw="h-full"
-                      $color={section.color}
-                      $widthPercent={section.amount / totalValue}
-                    />
-                  )
-              )}
+              {pieSections.map((section) => {
+                if (
+                  section.amount == null ||
+                  totalValue == null ||
+                  totalValue <= 0 ||
+                  section.amount <= 0
+                ) {
+                  return undefined;
+                }
+                const formattedDollars = formatNumberOutput(section.amount, OutputType.Fiat, {
+                  decimalSeparator,
+                  groupSeparator,
+                  selectedLocale,
+                });
+                const formattedPercent = formatNumberOutput(
+                  section.amount / totalValue,
+                  OutputType.Percent,
+                  { fractionDigits: 0, decimalSeparator, groupSeparator, selectedLocale }
+                );
+                return (
+                  <WithTooltip
+                    key={section.id}
+                    tooltipStringTitle={`${section.labelString ?? section.label}: ${formattedDollars} (${formattedPercent})`}
+                    slotTrigger={
+                      <$LineSegment
+                        tw="h-full"
+                        $color={section.color}
+                        $widthPercent={section.amount / totalValue}
+                      />
+                    }
+                  />
+                );
+              })}
             </div>
             <div tw="row w-full flex-1 text-center">
               {pieSections.map(
                 (section) =>
                   section.amount != null &&
                   totalValue != null &&
+                  totalValue > 0 &&
                   section.amount > 0 && (
                     <$LineSegment key={section.id} $widthPercent={section.amount / totalValue}>
                       {section.amount / totalValue > 0.09 && (

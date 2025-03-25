@@ -1,6 +1,8 @@
 import Abacus, { kollections } from '@dydxprotocol/v4-abacus';
 import { OrderSide } from '@dydxprotocol/v4-client-js';
 
+import { IndexerOrderType } from '@/types/indexer/indexerApiGen';
+
 import { STRING_KEYS } from './localization';
 import { TradeTypes } from './trade';
 
@@ -89,6 +91,7 @@ export const PerpetualMarketType = Abacus.exchange.dydx.abacus.output.PerpetualM
 
 // ------ Configs ------ //
 export const StatsigConfig = Abacus.exchange.dydx.abacus.state.manager.StatsigConfig;
+export const AutoSweepConfig = Abacus.exchange.dydx.abacus.state.manager.AutoSweepConfig;
 export type Configs = Abacus.exchange.dydx.abacus.output.Configs;
 export type FeeDiscount = Abacus.exchange.dydx.abacus.output.FeeDiscount;
 export type FeeTier = Abacus.exchange.dydx.abacus.output.FeeTier;
@@ -261,6 +264,8 @@ export type VaultDepositWithdrawSlippageResponse =
   Abacus.indexer.models.chain.OnChainVaultDepositWithdrawSlippageResponse;
 export type VaultFormValidationResult =
   Abacus.exchange.dydx.abacus.functional.vault.VaultFormValidationResult;
+export const IndexerMegavaultHistoricalPnlResponse =
+  Abacus.indexer.codegen.IndexerMegavaultHistoricalPnlResponse;
 export const { VaultCalculator, VaultAccountCalculator, VaultDepositWithdrawFormValidator } =
   Abacus.exchange.dydx.abacus.functional.vault;
 
@@ -368,6 +373,16 @@ export const TRADE_TYPES: Record<
 
   [AbacusOrderType.FinalSettlement.name]: null,
   [AbacusOrderType.FinalSettlement.rawValue]: null,
+};
+
+export const TRADE_TYPES_NEW: Record<IndexerOrderType, Nullable<TradeTypes>> = {
+  [IndexerOrderType.LIMIT]: TradeTypes.LIMIT,
+  [IndexerOrderType.MARKET]: TradeTypes.MARKET,
+  [IndexerOrderType.STOPLIMIT]: TradeTypes.STOP_LIMIT,
+  [IndexerOrderType.STOPMARKET]: TradeTypes.STOP_MARKET,
+  [IndexerOrderType.TAKEPROFITMARKET]: TradeTypes.TAKE_PROFIT_MARKET,
+  [IndexerOrderType.TRAILINGSTOP]: null,
+  [IndexerOrderType.TAKEPROFIT]: TradeTypes.TAKE_PROFIT,
 };
 
 export const MARGIN_MODE_STRINGS: Record<string, string> = {

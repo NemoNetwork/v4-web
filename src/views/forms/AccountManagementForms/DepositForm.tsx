@@ -41,14 +41,17 @@ import {
   NumberSign,
 } from '@/constants/numbers';
 import { AppRoute, BASE_ROUTE } from '@/constants/routes';
+import { StatsigFlags } from '@/constants/statsig';
 import { ConnectorType, type EvmAddress, WalletNetworkType, WalletType } from '@/constants/wallets';
 
-import { CHAIN_DEFAULT_TOKEN_ADDRESS, useAccountBalance } from '@/hooks/useAccountBalance';
+import { useAccountBalance } from '@/hooks/useAccountBalance';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useDydxClient } from '@/hooks/useDydxClient';
+import { useFunkitBuyNobleUsdc } from '@/hooks/useFunkitBuyNobleUsdc';
 import { useLocalNotifications } from '@/hooks/useLocalNotifications';
 import { usePhantomWallet } from '@/hooks/usePhantomWallet';
+import { useStatsigGateValue } from '@/hooks/useStatsig';
 import { useStringGetter } from '@/hooks/useStringGetter';
 import { useSubaccount } from '@/hooks/useSubaccount';
 import { useTokenConfigs } from '@/hooks/useTokenConfigs';
@@ -70,20 +73,22 @@ import { WithTooltip } from '@/components/WithTooltip';
 import { getOnboardingGuards } from '@/state/accountSelectors';
 import { getSelectedDydxChainId } from '@/state/appSelectors';
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
-import { forceOpenDialog } from '@/state/dialogs';
+import { closeDialog, forceOpenDialog } from '@/state/dialogs';
 import { getTransferInputs } from '@/state/inputsSelectors';
 
 import abacusStateManager from '@/lib/abacus';
 import { track } from '@/lib/analytics/analytics';
 import { dd } from '@/lib/analytics/datadog';
+import { isNativeDenom, WAGMI_COSMJS_NATIVE_TOKEN_ADDRESS } from '@/lib/assetUtils';
 import { MustBigNumber } from '@/lib/numbers';
-import { NATIVE_TOKEN_ADDRESS } from '@/lib/skip';
 import { log } from '@/lib/telemetry';
+import { testFlags } from '@/lib/testFlags';
 import { sleep } from '@/lib/timeUtils';
 import { parseWalletError } from '@/lib/wallet';
 
 import { CoinbaseDeposit } from '../CoinbaseDeposit';
 import { DepositButtonAndReceipt } from './DepositForm/DepositButtonAndReceipt';
+import { FunkitToggle } from './DepositForm/FunKitToggle';
 import { SourceSelectMenu } from './SourceSelectMenu';
 import { TokenSelectMenu } from './TokenSelectMenu';
 
@@ -109,6 +114,9 @@ export const DepositForm = ({ onDeposit, onError }: DepositFormProps) => {
   const [requireUserActionInWallet, setRequireUserActionInWallet] = useState(false);
   const selectedDydxChainId = useAppSelector(getSelectedDydxChainId);
   const { hasAcknowledgedTerms } = useAppSelector(getOnboardingGuards);
+  const ffEnableFunkit =
+    (useStatsigGateValue(StatsigFlags.ffEnableFunkit) || testFlags.showInstantDepositToggle) &&
+    import.meta.env.VITE_FUNKIT_API_KEY;
 
   const {
     dydxAddress,
@@ -176,13 +184,16 @@ export const DepositForm = ({ onDeposit, onError }: DepositFormProps) => {
 
   // Async Data
   const { balance } = useAccountBalance({
-    addressOrDenom: sourceToken?.address || CHAIN_DEFAULT_TOKEN_ADDRESS,
+    addressOrDenom: sourceToken?.address || WAGMI_COSMJS_NATIVE_TOKEN_ADDRESS,
     chainId,
     isCosmosChain: isKeplrWallet,
   });
   // BN
   const debouncedAmountBN = MustBigNumber(debouncedAmount);
   const balanceBN = MustBigNumber(balance);
+
+  // Funkit Deposit
+  const startCheckout = useFunkitBuyNobleUsdc();
 
   useEffect(() => {
     setSlippage(isCctp || isKeplrWallet ? 0 : 0.01);
@@ -320,8 +331,8 @@ export const DepositForm = ({ onDeposit, onError }: DepositFormProps) => {
     if (!sourceToken?.address || !sourceToken.decimals)
       throw new Error('Missing source token address');
     if (!requestPayload?.targetAddress) throw new Error('Missing target address');
-    if (!requestPayload?.value) throw new Error('Missing transaction value');
-    if (sourceToken?.address === NATIVE_TOKEN_ADDRESS) return;
+    if (!requestPayload.value) throw new Error('Missing transaction value');
+    if (isNativeDenom(sourceToken.address)) return;
 
     const allowance = await publicClientWagmi.readContract({
       address: sourceToken.address as EvmAddress,
@@ -480,6 +491,7 @@ export const DepositForm = ({ onDeposit, onError }: DepositFormProps) => {
         estimatedRouteDuration: summary?.estimatedRouteDurationSeconds || undefined,
         toAmount: summary?.toAmount || undefined,
         toAmountMin: summary?.toAmountMin || undefined,
+        isFunkit: false,
       });
 
       abacusStateManager.clearTransferInputValues();
@@ -545,12 +557,14 @@ export const DepositForm = ({ onDeposit, onError }: DepositFormProps) => {
           }
 
           setDepositStep(DepositSteps.Confirm);
-          txHash = await signTransactionPhantom(Buffer.from(requestPayload.data, 'base64'));
+          txHash = await signTransactionPhantom(
+            new Uint8Array(Buffer.from(requestPayload.data, 'base64'))
+          );
         } else {
           if (!signerWagmi) {
             throw new Error('Missing signer');
           }
-          if (!requestPayload?.targetAddress || !requestPayload?.data || !requestPayload?.value) {
+          if (!requestPayload?.targetAddress || !requestPayload.data || !requestPayload.value) {
             throw new Error('Missing request payload');
           }
           await validateTokenApproval();
@@ -737,6 +751,14 @@ export const DepositForm = ({ onDeposit, onError }: DepositFormProps) => {
   }
   return (
     <$Form onSubmit={onSubmit}>
+      {ffEnableFunkit && (
+        <FunkitToggle
+          onToggle={() => {
+            dispatch(closeDialog());
+            startCheckout();
+          }}
+        />
+      )}
       <div tw="text-color-text-0">
         {stringGetter({
           key: STRING_KEYS.LOWEST_FEE_DEPOSITS,
@@ -841,5 +863,4 @@ const $Form = styled.form`
 `;
 const $Footer = styled.footer`
   ${formMixins.footer}
-  --stickyFooterBackdrop-outsetY: var(--dialog-content-paddingBottom);
 `;

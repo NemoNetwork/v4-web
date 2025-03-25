@@ -79,7 +79,7 @@ export const DropdownMenu = forwardRefFn(
                 <$Item
                   disabled={!item.onSelect}
                   $highlightColor={item.highlightColor}
-                  onSelect={item?.onSelect}
+                  onSelect={item.onSelect}
                 >
                   {item.icon}
                   {item.label}
@@ -124,7 +124,6 @@ const $Item = styled(Item)<{ $highlightColor?: 'accent' | 'create' | 'destroy' }
 
 const $Trigger = styled(Trigger)`
   ${popoverMixins.trigger}
-  ${popoverMixins.backdropOverlay}
 `;
 
 const $DropdownIcon = styled.span`

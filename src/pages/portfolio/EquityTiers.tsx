@@ -1,8 +1,8 @@
-import { shallowEqual } from 'react-redux';
+import { BonsaiCore } from '@/bonsai/ontology';
+import { EquityTierSummary } from '@/bonsai/types/summaryTypes';
 import styled from 'styled-components';
 import tw from 'twin.macro';
 
-import { EquityTier } from '@/constants/abacus';
 import { STRING_KEYS } from '@/constants/localization';
 
 import { useBreakpoints } from '@/hooks/useBreakpoints';
@@ -18,11 +18,10 @@ import { Output, OutputType } from '@/components/Output';
 import { ColumnDef, Table } from '@/components/Table';
 
 import { useAppSelector } from '@/state/appTypes';
-import { getStatefulOrderEquityTiers } from '@/state/configsSelectors';
 
 export const EquityTiers = () => {
   const stringGetter = useStringGetter();
-  const equityTiers = useAppSelector(getStatefulOrderEquityTiers, shallowEqual);
+  const equityTiers = useAppSelector(BonsaiCore.configs.equityTiers)?.statefulOrderEquityTiers;
   const { isNotTablet } = useBreakpoints();
   const { equityTiersLearnMore } = useURLConfigs();
 
@@ -37,7 +36,7 @@ export const EquityTiers = () => {
             {stringGetter({
               key: STRING_KEYS.EQUITY_TIERS_DESCRIPTION_LONG,
             })}
-          </span>
+          </span>{' '}
           {equityTiersLearnMore && (
             <Link href={equityTiersLearnMore}>
               {stringGetter({ key: STRING_KEYS.LEARN_MORE })} →
@@ -47,7 +46,8 @@ export const EquityTiers = () => {
         <$Table
           label={stringGetter({ key: STRING_KEYS.EQUITY_TIERS })}
           data={equityTiers ?? []}
-          getRowKey={(row: EquityTier) => row.requiredTotalNetCollateralUSD}
+          tableId="equity-tiers"
+          getRowKey={(row: EquityTierSummary) => row.requiredTotalNetCollateralUSD}
           columns={
             [
               {
@@ -94,22 +94,22 @@ export const EquityTiers = () => {
                   <$HighlightOutput type={OutputType.Number} value={maxOrders} />
                 ),
               },
-            ] satisfies ColumnDef<EquityTier>[]
+            ] satisfies ColumnDef<EquityTierSummary>[]
           }
           selectionBehavior="replace"
           paginationBehavior="showAll"
-          withOuterBorder={isNotTablet}
+          withOuterBorder
           withInnerBorders
         />
       </div>
     </AttachedExpandingSection>
   );
 };
+
 const $Table = styled(Table)`
   --tableCell-padding: 0.5rem 1.5rem;
   --bordered-content-border-radius: 0.625rem;
   --table-cell-align: end;
-
   font: var(--font-base-book);
 
   @media ${breakpoints.mobile} {
@@ -118,11 +118,12 @@ const $Table = styled(Table)`
   }
 
   @media ${breakpoints.notTablet} {
-    --tableStickyRow-backgroundColor: var(--color-layer-1);
+    --tableStickyRow-backgroundColor: var(--color-layer-2);
   }
 ` as typeof Table;
 
 const $HighlightOutput = tw(Output)`text-color-text-1`;
+
 const $Description = styled.div`
   color: var(--color-text-0);
   padding: 0 1rem;

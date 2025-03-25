@@ -28,6 +28,7 @@ import { Tag } from '@/components/Tag';
 import { useAppSelector } from '@/state/appTypes';
 import { getSelectedLocale } from '@/state/localizationSelectors';
 
+import { formatZeroNumbers } from '@/lib/formatZeroNumbers';
 import { MustBigNumber, isNumber, type BigNumberish } from '@/lib/numbers';
 import { getStringsForDateTimeDiff, getTimestamp } from '@/lib/timeUtils';
 
@@ -121,6 +122,7 @@ export function formatNumberOutput(
     fractionDigits,
     minimumFractionDigits,
     showSign = ShowSign.Negative,
+    withSubscript = false,
   }: {
     decimalSeparator: string | undefined;
     groupSeparator: string | undefined;
@@ -131,6 +133,7 @@ export function formatNumberOutput(
     roundingMode?: BigNumber.RoundingMode;
     useGrouping?: boolean;
     showSign?: ShowSign;
+    withSubscript?: boolean;
   }
 ) {
   const valueBN = MustBigNumber(value).abs();
@@ -204,7 +207,28 @@ export function formatNumberOutput(
     [OutputType.Multiple]: () => getFormattedVal(valueBN, LEVERAGE_DECIMALS, { suffix: '×' }),
   };
 
-  return `${sign ?? ''}${numberRenderers[type]()}`;
+  const renderedNumber = `${sign ?? ''}${numberRenderers[type]()}`;
+
+  if (withSubscript) {
+    const { currencySign, significantDigits, decimalDigits, zeros, punctuationSymbol } =
+      formatZeroNumbers(renderedNumber);
+
+    if (zeros) {
+      let subscript = '';
+
+      zeros
+        .toString()
+        .split('')
+        .map(Number)
+        .forEach((digit) => {
+          subscript += UNICODE.SUBSCRIPT[digit];
+        });
+
+      return `${currencySign ?? ''}${significantDigits}${punctuationSymbol}0${subscript}${decimalDigits}`;
+    }
+  }
+
+  return renderedNumber;
 }
 
 // must manually memoize options object if you want proper memoization
@@ -260,6 +284,7 @@ type ElementProps = {
   tag?: React.ReactNode;
   slotLeft?: React.ReactNode;
   slotRight?: React.ReactNode;
+  title?: string;
 
   // only for numbers, but they are most common so we hoist
   fractionDigits?: number | null;
@@ -295,6 +320,7 @@ export const Output = ({
   isLoading,
   slotLeft,
   slotRight,
+  title,
   tag,
   className,
   withBaseFont,
@@ -320,7 +346,7 @@ export const Output = ({
   const { decimal: decimalSeparator, group: groupSeparator } = useLocaleSeparators();
 
   if (!!isLoading || !!isDetailsLoading) {
-    return <LoadingOutput />;
+    return <LoadingOutput className={className} />;
   }
 
   switch (type) {
@@ -351,7 +377,7 @@ export const Output = ({
         return (
           <$Text
             key={value?.toString()}
-            title={`${value ?? ''}${tag ? ` ${tag}` : ''}`}
+            title={`${title ?? value ?? ''}${tag ? ` ${tag}` : ''}`}
             className={className}
           >
             <time
@@ -370,7 +396,7 @@ export const Output = ({
       return (
         <$Text
           key={value?.toString()}
-          title={`${value ?? ''}${tag ? ` ${tag}` : ''}`}
+          title={`${title ?? value ?? ''}${tag ? ` ${tag}` : ''}`}
           className={className}
         >
           <RelativeTime timestamp={timestamp} {...relativeTimeOptions} />
@@ -390,7 +416,7 @@ export const Output = ({
       });
 
       return (
-        <$Text key={value} title={`${value ?? ''}${tag ? ` ${tag}` : ''}`} className={className}>
+        <$Text key={value} title={title ?? `${value}${tag ? ` ${tag}` : ''}`} className={className}>
           {dateString}
         </$Text>
       );
@@ -431,14 +457,17 @@ export const Output = ({
       return (
         <$Number
           key={value?.toString()}
-          title={`${value ?? ''}${
-            (
-              { [OutputType.Multiple]: '×', [OutputType.Fiat]: ' USD' } as Record<
-                OutputType,
-                string
-              >
-            )[type] ?? ''
-          }${tag ? ` ${tag}` : ''}`}
+          title={
+            title ??
+            `${value ?? ''}${
+              (
+                { [OutputType.Multiple]: '×', [OutputType.Fiat]: ' USD' } as Record<
+                  OutputType,
+                  string | undefined
+                >
+              )[type] ?? ''
+            }${tag ? ` ${tag}` : ''}`
+          }
           className={className}
           withParentheses={withParentheses}
           withBaseFont={withBaseFont}
@@ -469,7 +498,7 @@ const $Text = styled.output<{ withParentheses?: boolean }>`
     opacity: 0.5;
 
     &:after {
-      content: '-' var(--output-afterString);
+      content: '—' var(--output-afterString);
     }
   }
 

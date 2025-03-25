@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 
+import { BonsaiHelpers } from '@/bonsai/ontology';
 import { shallowEqual } from 'react-redux';
 
 import { STRING_KEYS, StringKey } from '@/constants/localization';
@@ -13,7 +14,6 @@ import { AssetIcon } from '@/components/AssetIcon';
 
 import { useAppSelector } from '@/state/appTypes';
 import { getInputTradeData, getInputTradeOptions } from '@/state/inputsSelectors';
-import { getCurrentMarketAssetId } from '@/state/perpetualsSelectors';
 
 import { isTruthy } from '@/lib/isTruthy';
 import { getSelectedTradeType } from '@/lib/tradeData';
@@ -23,7 +23,9 @@ export const useTradeTypeOptions = (opts?: { showAssetIcon?: boolean; showAll?: 
   const stringGetter = useStringGetter();
 
   const currentTradeData = useAppSelector(getInputTradeData, shallowEqual);
-  const currentAssetId = useAppSelector(getCurrentMarketAssetId);
+  const currentAssetId = useAppSelector(BonsaiHelpers.currentMarket.assetId);
+  const imageUrl = useAppSelector(BonsaiHelpers.currentMarket.assetLogo);
+
   const { type: tradeType } = currentTradeData ?? {};
 
   const selectedTradeType = getSelectedTradeType(tradeType);
@@ -31,7 +33,7 @@ export const useTradeTypeOptions = (opts?: { showAssetIcon?: boolean; showAll?: 
   const { typeOptions } = useAppSelector(getInputTradeOptions, shallowEqual) ?? {};
 
   const allTradeTypeItems = useMemo((): Array<MenuItem<TradeTypes>> | undefined => {
-    const allItems = typeOptions?.toArray()?.map(({ type, stringKey }) => ({
+    const allItems = typeOptions?.toArray().map(({ type, stringKey }) => ({
       value: type as TradeTypes,
       label: stringGetter({
         key:
@@ -39,10 +41,12 @@ export const useTradeTypeOptions = (opts?: { showAssetIcon?: boolean; showAll?: 
             ? STRING_KEYS.TAKE_PROFIT_LIMIT
             : ((stringKey ?? '') as StringKey),
       }),
-      slotBefore: showAssetIcon ? <AssetIcon symbol={currentAssetId} /> : undefined,
+      slotBefore: showAssetIcon ? (
+        <AssetIcon logoUrl={imageUrl} symbol={currentAssetId} />
+      ) : undefined,
     }));
     return allItems;
-  }, [currentAssetId, showAssetIcon, stringGetter, typeOptions]);
+  }, [currentAssetId, imageUrl, showAssetIcon, stringGetter, typeOptions]);
 
   const asSubItems = useMemo((): Array<MenuItem<TradeTypes>> => {
     if (allTradeTypeItems == null || allTradeTypeItems.length === 0) {
@@ -54,7 +58,11 @@ export const useTradeTypeOptions = (opts?: { showAssetIcon?: boolean; showAll?: 
       // All conditional orders labeled under "Stop Order"
       allTradeTypeItems.length > 2
         ? {
-            label: stringGetter({ key: STRING_KEYS.STOP_ORDER_SHORT }),
+            label:
+              selectedTradeType === TradeTypes.TAKE_PROFIT ||
+              selectedTradeType === TradeTypes.TAKE_PROFIT_MARKET
+                ? stringGetter({ key: STRING_KEYS.TAKE_PROFIT })
+                : stringGetter({ key: STRING_KEYS.STOP_ORDER_SHORT }),
             value: '' as TradeTypes,
             subitems: allTradeTypeItems.slice(2),
           }

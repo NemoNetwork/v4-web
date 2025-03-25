@@ -1,4 +1,4 @@
-import { shallowEqual } from 'react-redux';
+import { BonsaiHelpers } from '@/bonsai/ontology';
 import styled from 'styled-components';
 
 import { layoutMixins } from '@/styles/layoutMixins';
@@ -9,11 +9,9 @@ import { MarketStatsDetails } from '@/views/MarketStatsDetails';
 import { MarketsDropdown } from '@/views/MarketsDropdown';
 
 import { useAppSelector } from '@/state/appTypes';
-import { getCurrentMarketAssetData } from '@/state/assetsSelectors';
 import { getCurrentMarketDisplayId } from '@/state/perpetualsSelectors';
 
 import { getDisplayableTickerFromMarket } from '@/lib/assetUtils';
-import { testFlags } from '@/lib/testFlags';
 
 export const MarketSelectorAndStats = ({
   className,
@@ -22,10 +20,8 @@ export const MarketSelectorAndStats = ({
   className?: string;
   launchableMarketId?: string;
 }) => {
-  const { id = '' } = useAppSelector(getCurrentMarketAssetData, shallowEqual) ?? {};
+  const imageUrl = useAppSelector(BonsaiHelpers.currentMarket.assetLogo);
   const currentMarketId = useAppSelector(getCurrentMarketDisplayId) ?? '';
-
-  const { uiRefresh } = testFlags;
 
   const displayableId = launchableMarketId
     ? getDisplayableTickerFromMarket(launchableMarketId)
@@ -36,10 +32,10 @@ export const MarketSelectorAndStats = ({
       <MarketsDropdown
         launchableMarketId={launchableMarketId}
         currentMarketId={displayableId ?? currentMarketId}
-        symbol={id}
+        logoUrl={imageUrl}
       />
 
-      <VerticalSeparator fullHeight={!!uiRefresh} />
+      <VerticalSeparator fullHeight />
 
       {launchableMarketId ? (
         <LaunchableMarketStatsDetails launchableMarketId={launchableMarketId} />
@@ -52,7 +48,7 @@ export const MarketSelectorAndStats = ({
 const $Container = styled.div`
   ${layoutMixins.container}
   ${layoutMixins.scrollAreaFadeEnd}
-
+  
   display: grid;
 
   grid-template:

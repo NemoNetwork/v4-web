@@ -1,5 +1,5 @@
+import { BonsaiHelpers } from '@/bonsai/ontology';
 import { OrderSide } from '@dydxprotocol/v4-client-js';
-import { shallowEqual } from 'react-redux';
 
 import {
   AbacusOrderStatus,
@@ -12,6 +12,7 @@ import { STRING_KEYS } from '@/constants/localization';
 import { USD_DECIMALS } from '@/constants/numbers';
 import { ORDER_TYPE_STRINGS } from '@/constants/trade';
 
+import { useParameterizedSelector } from '@/hooks/useParameterizedSelector';
 import { useStringGetter } from '@/hooks/useStringGetter';
 
 import { AssetIcon } from '@/components/AssetIcon';
@@ -19,8 +20,7 @@ import { AssetIcon } from '@/components/AssetIcon';
 import { Notification, NotificationProps } from '@/components/Notification';
 import { OrderStatusIcon } from '@/views/OrderStatusIcon';
 
-import { useAppSelector } from '@/state/appTypes';
-import { getMarketData } from '@/state/perpetualsSelectors';
+import { orEmptyObj } from '@/lib/typeUtils';
 
 import { FillDetails } from './FillDetails';
 
@@ -44,18 +44,22 @@ export type TradeNotificationProps = NotificationProps & ElementProps;
 export const TradeNotification = ({ isToast, data, notification }: TradeNotificationProps) => {
   const stringGetter = useStringGetter();
   const { AVERAGE_PRICE, FILLED_AMOUNT, MARKET, ORDER_TYPE, ORDER_STATUS, SIDE } = data;
-  const marketData = useAppSelector((s) => getMarketData(s, MARKET), shallowEqual);
-  const { assetId } = marketData ?? {};
+  const marketData = useParameterizedSelector(
+    BonsaiHelpers.markets.createSelectMarketSummaryById,
+    MARKET
+  );
+  const { assetId } = orEmptyObj(marketData);
+  const assetImgUrl = useParameterizedSelector(BonsaiHelpers.assets.createSelectAssetLogo, assetId);
   const orderType = ORDER_TYPE as KotlinIrEnumValues<typeof AbacusOrderType>;
   const tradeType = TRADE_TYPES[orderType] ?? undefined;
-  const titleKey = tradeType && ORDER_TYPE_STRINGS[tradeType]?.orderTypeKey;
+  const titleKey = tradeType && ORDER_TYPE_STRINGS[tradeType].orderTypeKey;
   const orderStatus = ORDER_STATUS as KotlinIrEnumValues<typeof AbacusOrderStatus>;
 
   return (
     <Notification
       isToast={isToast}
       notification={notification}
-      slotIcon={<AssetIcon symbol={assetId} />}
+      slotIcon={<AssetIcon logoUrl={assetImgUrl} symbol={assetId} />}
       slotTitle={titleKey && stringGetter({ key: titleKey })}
       slotTitleRight={
         <span tw="row gap-[0.5ch] text-color-text-0 font-small-book">
@@ -66,11 +70,10 @@ export const TradeNotification = ({ isToast, data, notification }: TradeNotifica
       slotCustomContent={
         <FillDetails
           orderSide={SIDE === STRING_KEYS.BUY ? OrderSide.BUY : OrderSide.SELL}
-          tradeType={tradeType}
           filledAmount={FILLED_AMOUNT}
           assetId={marketData?.assetId}
           averagePrice={AVERAGE_PRICE}
-          tickSizeDecimals={marketData?.configs?.displayTickSizeDecimals ?? USD_DECIMALS}
+          tickSizeDecimals={marketData?.tickSizeDecimals ?? USD_DECIMALS}
         />
       }
     />

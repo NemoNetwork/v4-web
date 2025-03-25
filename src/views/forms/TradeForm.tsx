@@ -1,12 +1,13 @@
 import { useCallback, useMemo, useState, type FormEvent } from 'react';
 
+import { BonsaiHelpers } from '@/bonsai/ontology';
+import { ComplianceStatus } from '@/bonsai/types/summaryTypes';
 import { OrderSide } from '@dydxprotocol/v4-client-js';
 import { shallowEqual } from 'react-redux';
 import styled, { css } from 'styled-components';
 
 import {
   AbacusInputTypes,
-  ComplianceStatus,
   ErrorType,
   TradeInputErrorAction,
   TradeInputField,
@@ -15,7 +16,7 @@ import {
   type Nullable,
 } from '@/constants/abacus';
 import { AlertType } from '@/constants/alerts';
-import { ButtonAction, ButtonShape, ButtonSize, ButtonType } from '@/constants/buttons';
+import { ButtonAction, ButtonShape, ButtonSize } from '@/constants/buttons';
 import { ErrorParams } from '@/constants/errors';
 import { STRING_KEYS } from '@/constants/localization';
 import { NotificationType } from '@/constants/notifications';
@@ -33,27 +34,32 @@ import { formMixins } from '@/styles/formMixins';
 import { layoutMixins } from '@/styles/layoutMixins';
 
 import { AlertMessage } from '@/components/AlertMessage';
-import { Button } from '@/components/Button';
 import { Icon, IconName } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { Link } from '@/components/Link';
+import { LoadingSpace } from '@/components/Loading/LoadingSpinner';
 import { ToggleButton } from '@/components/ToggleButton';
 import { ToggleGroup } from '@/components/ToggleGroup';
 
 import { useAppSelector } from '@/state/appTypes';
+import { getCurrentMarketId } from '@/state/currentMarketSelectors';
 import {
   getCurrentInput,
   getInputTradeData,
   getTradeFormInputs,
   useTradeFormData,
 } from '@/state/inputsSelectors';
-import { getCurrentMarketConfig } from '@/state/perpetualsSelectors';
+import { getCurrentMarketOraclePrice } from '@/state/perpetualsSelectors';
 
 import abacusStateManager from '@/lib/abacus';
+import { isTruthy } from '@/lib/isTruthy';
 import { getSelectedOrderSide, getTradeInputAlert } from '@/lib/tradeData';
+import { orEmptyObj } from '@/lib/typeUtils';
 
 import { CanvasOrderbook } from '../CanvasOrderbook/CanvasOrderbook';
+import { TradeSideTabs } from '../TradeSideTabs';
 import { AdvancedTradeOptions } from './TradeForm/AdvancedTradeOptions';
+import { MarginAndLeverageButtons } from './TradeForm/MarginAndLeverageButtons';
 import { PlaceOrderButtonAndReceipt } from './TradeForm/PlaceOrderButtonAndReceipt';
 import { PositionPreview } from './TradeForm/PositionPreview';
 import { TradeFormInfoMessages } from './TradeForm/TradeFormInfoMessages';
@@ -88,8 +94,12 @@ export const TradeForm = ({
   const { price, size, summary, tradeErrors } = useTradeFormData();
 
   const currentInput = useAppSelector(getCurrentInput);
-  const { tickSizeDecimals, stepSizeDecimals } =
-    useAppSelector(getCurrentMarketConfig, shallowEqual) ?? {};
+  const { tickSizeDecimals, stepSizeDecimals } = orEmptyObj(
+    useAppSelector(BonsaiHelpers.currentMarket.stableMarketInfo)
+  );
+
+  const oraclePrice = useAppSelector(getCurrentMarketOraclePrice);
+  const currentMarketId = useAppSelector(getCurrentMarketId);
 
   const tradeFormInputValues = useAppSelector(getTradeFormInputs, shallowEqual);
 
@@ -252,7 +262,6 @@ export const TradeForm = ({
         </$OrderbookButton>
         {/* TODO[TRCL-1411]: add orderbook scale functionality */}
       </div>
-
       <$ToggleGroup
         items={allTradeTypeItems}
         value={selectedTradeType}
@@ -306,35 +315,27 @@ export const TradeForm = ({
   );
 
   const tradeFooter = (
-    <$Footer>
-      {isInputFilled && (!currentStep || currentStep === MobilePlaceOrderSteps.EditOrder) && (
-        <div tw="row justify-self-end px-0 py-0.5">
-          <Button
-            type={ButtonType.Reset}
-            action={ButtonAction.Reset}
-            shape={ButtonShape.Pill}
-            size={ButtonSize.XSmall}
-            onClick={() => abacusStateManager.clearTradeInputValues({ shouldResetSize: true })}
-          >
-            {stringGetter({ key: STRING_KEYS.CLEAR })}
-          </Button>
-        </div>
-      )}
-      <PlaceOrderButtonAndReceipt
-        hasValidationErrors={hasInputErrors}
-        actionStringKey={inputAlert?.actionStringKey}
-        validationErrorString={shortAlertContent}
-        summary={summary ?? undefined}
-        currentStep={currentStep}
-        showDeposit={inputAlert?.errorAction === TradeInputErrorAction.DEPOSIT}
-        confirmButtonConfig={{
-          stringKey: ORDER_TYPE_STRINGS[selectedTradeType].orderTypeKey,
-          buttonTextStringKey: STRING_KEYS.PLACE_ORDER,
-          buttonAction: orderSideAction,
-        }}
-      />
-    </$Footer>
+    <PlaceOrderButtonAndReceipt
+      hasValidationErrors={hasInputErrors}
+      hasInput={isInputFilled && (!currentStep || currentStep === MobilePlaceOrderSteps.EditOrder)}
+      onClearInputs={() => abacusStateManager.clearTradeInputValues({ shouldResetSize: true })}
+      actionStringKey={inputAlert?.actionStringKey}
+      validationErrorString={shortAlertContent}
+      summary={summary ?? undefined}
+      currentStep={currentStep}
+      showDeposit={inputAlert?.errorAction === TradeInputErrorAction.DEPOSIT}
+      confirmButtonConfig={{
+        stringKey: ORDER_TYPE_STRINGS[selectedTradeType].orderTypeKey,
+        buttonTextStringKey: STRING_KEYS.PLACE_ORDER,
+        buttonAction: orderSideAction as ButtonAction,
+      }}
+    />
   );
+
+  // prevent real trading if null/zero oracle price or we are out of sync with abacus somehow
+  if (!isTruthy(oraclePrice) || currentMarketId !== marketId) {
+    return <LoadingSpace />;
+  }
 
   return (
     <$TradeForm onSubmit={onSubmit} className={className}>
@@ -343,6 +344,17 @@ export const TradeForm = ({
           <PositionPreview />
           {alertContent && <AlertMessage type={alertType}>{alertContent}</AlertMessage>}
         </>
+      ) : currentStep && currentStep === MobilePlaceOrderSteps.EditOrder ? (
+        <TradeSideTabs
+          tw="overflow-visible"
+          sharedContent={
+            <$Content tw="gap-0.75 shadow-none">
+              <$MarginAndLeverageButtons />
+              {tabletActionsRow}
+              {orderbookAndInputs}
+            </$Content>
+          }
+        />
       ) : (
         <>
           {tabletActionsRow}
@@ -397,6 +409,10 @@ const $TradeForm = styled.form`
   }
 `;
 
+const $Content = styled.div`
+  ${layoutMixins.flexColumn}
+`;
+
 const $TopActionsRow = styled.div`
   display: grid;
   grid-auto-flow: column;
@@ -405,6 +421,10 @@ const $TopActionsRow = styled.div`
     grid-auto-columns: var(--orderbox-column-width) 1fr;
     gap: var(--orderbox-gap);
   }
+`;
+
+const $MarginAndLeverageButtons = styled(MarginAndLeverageButtons)`
+  margin-top: 0.75rem;
 `;
 
 const $OrderbookButton = styled(ToggleButton)`
@@ -453,11 +473,8 @@ const $OrderbookAndInputs = styled.div<{ showOrderbook: boolean }>`
 `;
 
 const $ToggleGroup = styled(ToggleGroup)`
-  overflow-x: auto;
-
   button[data-state='off'] {
     gap: 0;
-
     img {
       display: none;
     }
@@ -471,10 +488,4 @@ const $IconButton = styled(IconButton)`
 
 const $InputsColumn = styled.div`
   ${formMixins.inputsColumn}
-`;
-const $Footer = styled.footer`
-  ${formMixins.footer}
-  --stickyFooterBackdrop-outsetY: var(--tradeBox-content-paddingBottom);
-
-  ${layoutMixins.column}
 `;

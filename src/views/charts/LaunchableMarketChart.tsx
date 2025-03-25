@@ -5,21 +5,23 @@ import { RenderTooltipParams } from '@visx/xychart/lib/components/Tooltip';
 import styled from 'styled-components';
 import tw from 'twin.macro';
 
+import { AnalyticsEvents } from '@/constants/analytics';
 import { MetadataServiceCandlesTimeframes } from '@/constants/assetMetadata';
 import { ButtonSize } from '@/constants/buttons';
 import { TradingViewBar } from '@/constants/candles';
 import { STRING_KEYS } from '@/constants/localization';
-import { LIQUIDITY_TIERS } from '@/constants/markets';
+import { ISOLATED_LIQUIDITY_TIER_INFO } from '@/constants/markets';
 import { timeUnits } from '@/constants/time';
 import { TooltipStringKeys } from '@/constants/tooltips';
 
 import {
   useMetadataServiceAssetFromId,
   useMetadataServiceCandles,
-} from '@/hooks/useLaunchableMarkets';
+} from '@/hooks/useMetadataService';
 import { useStringGetter } from '@/hooks/useStringGetter';
 
 import { LinkOutIcon } from '@/icons';
+import breakpoints from '@/styles/breakpoints';
 
 import { Details } from '@/components/Details';
 import { Icon, IconName } from '@/components/Icon';
@@ -31,14 +33,13 @@ import { ToggleGroup } from '@/components/ToggleGroup';
 import { TimeSeriesChart } from '@/components/visx/TimeSeriesChart';
 
 import { useAppSelector } from '@/state/appTypes';
-import { getChartDotBackground } from '@/state/configsSelectors';
+import { getChartDotBackground } from '@/state/appUiConfigsSelectors';
 import { getSelectedLocale } from '@/state/localizationSelectors';
 
+import { track } from '@/lib/analytics/analytics';
 import { getDisplayableAssetFromBaseAsset } from '@/lib/assetUtils';
 import { BIG_NUMBERS } from '@/lib/numbers';
 import { orEmptyObj } from '@/lib/typeUtils';
-
-const ISOLATED_LIQUIDITY_TIER_INFO = LIQUIDITY_TIERS[4];
 
 export const LaunchableMarketChart = ({
   className,
@@ -70,7 +71,6 @@ export const LaunchableMarketChart = ({
       value: (
         <Output
           type={OutputType.CompactFiat}
-          isLoading={!ticker}
           tw="text-color-text-1"
           value={showSelfReportedMarketCap ? reportedMarketCap : marketCap}
         />
@@ -83,7 +83,6 @@ export const LaunchableMarketChart = ({
       value: (
         <Output
           type={OutputType.Multiple}
-          isLoading={!ticker}
           value={
             ISOLATED_LIQUIDITY_TIER_INFO.initialMarginFraction
               ? BIG_NUMBERS.ONE.div(ISOLATED_LIQUIDITY_TIER_INFO.initialMarginFraction)
@@ -94,13 +93,13 @@ export const LaunchableMarketChart = ({
     },
   ];
 
-  const xAccessorFunc = useCallback((datum: TradingViewBar) => datum.time, []);
-  const yAccessorFunc = useCallback((datum: TradingViewBar) => datum.close, []);
+  const xAccessorFunc = useCallback((datum: TradingViewBar | undefined) => datum?.time ?? 0, []);
+  const yAccessorFunc = useCallback((datum: TradingViewBar | undefined) => datum?.close ?? 0, []);
 
   const colorString = useMemo(() => {
-    if (!candlesQuery.data) return 'var(--color-text-1)';
-    const first = candlesQuery.data[0];
-    const last = candlesQuery.data[candlesQuery.data.length - 1];
+    if (!candlesQuery.data || candlesQuery.data.length < 1) return 'var(--color-text-1)';
+    const first = candlesQuery.data[0]!;
+    const last = candlesQuery.data[candlesQuery.data.length - 1]!;
     if (first.close > last.close) return 'var(--color-negative)';
     return 'var(--color-positive)';
   }, [candlesQuery.data]);
@@ -128,7 +127,7 @@ export const LaunchableMarketChart = ({
   );
 
   const renderTooltip = (tooltipParam: RenderTooltipParams<TradingViewBar>) => {
-    const datum = tooltipParam?.tooltipData?.nearestDatum?.datum;
+    const datum = tooltipParam.tooltipData?.nearestDatum?.datum;
     if (!datum) return <div />;
 
     return (
@@ -137,6 +136,7 @@ export const LaunchableMarketChart = ({
         <span>
           {stringGetter({ key: STRING_KEYS.PRICE })}:{' '}
           <Output
+            withSubscript
             tw="inline"
             value={datum.close}
             type={OutputType.Fiat}
@@ -146,6 +146,20 @@ export const LaunchableMarketChart = ({
       </div>
     );
   };
+
+  const trackTimeframeChange = useCallback(
+    (selectedTimeframe: string) => {
+      if (id) {
+        track(
+          AnalyticsEvents.LaunchMarketPageChangePriceChartTimeframe({
+            asset: id,
+            timeframe: selectedTimeframe,
+          })
+        );
+      }
+    },
+    [id]
+  );
 
   return (
     <$LaunchableMarketChartContainer className={className}>
@@ -179,10 +193,10 @@ export const LaunchableMarketChart = ({
               tooltip: 'reference-price',
               value: (
                 <Output
+                  withSubscript
                   type={OutputType.Fiat}
                   tw="text-color-text-1"
                   value={price}
-                  isLoading={!ticker}
                   fractionDigits={tickSizeDecimals}
                 />
               ),
@@ -195,14 +209,23 @@ export const LaunchableMarketChart = ({
             {
               value: '1d',
               label: `1${stringGetter({ key: STRING_KEYS.DAYS_ABBREVIATED })}`,
+              onClick() {
+                trackTimeframeChange('1d');
+              },
             },
             {
               value: '7d',
               label: `7${stringGetter({ key: STRING_KEYS.DAYS_ABBREVIATED })}`,
+              onClick() {
+                trackTimeframeChange('7d');
+              },
             },
             {
               value: '30d',
               label: `30${stringGetter({ key: STRING_KEYS.DAYS_ABBREVIATED })}`,
+              onClick() {
+                trackTimeframeChange('30d');
+              },
             },
           ]}
           value={timeframe}
@@ -245,7 +268,14 @@ export const LaunchableMarketChart = ({
   );
 };
 
-const $LaunchableMarketChartContainer = tw.div`flex h-fit w-[25rem] flex-col gap-1 rounded-[1rem] border-[length:--border-width] border-color-border p-1.5 [border-style:solid]`;
+const $LaunchableMarketChartContainer = styled.div`
+  ${tw`flex h-fit w-[25rem] flex-col gap-1 rounded-[1rem] border-[length:--border-width] border-color-border p-1.5 [border-style:solid]`}
+
+  @media ${breakpoints.tablet} {
+    ${tw`w-full`}
+    border: none;
+  }
+`;
 
 const $ChartContainerHeader = tw.div`flex flex-row items-center justify-between`;
 

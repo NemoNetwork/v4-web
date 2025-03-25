@@ -1,26 +1,29 @@
-import { shallowEqual } from 'react-redux';
+import { BonsaiHelpers } from '@/bonsai/ontology';
 import styled from 'styled-components';
 
 import { ButtonType } from '@/constants/buttons';
 
-import { useMetadataServiceAssetFromId } from '@/hooks/useLaunchableMarkets';
+import { useMetadataServiceAssetFromId } from '@/hooks/useMetadataService';
 
 import { IconName } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 
 import { useAppSelector } from '@/state/appTypes';
-import { getCurrentMarketAssetData } from '@/state/assetsSelectors';
 
-import { testFlags } from '@/lib/testFlags';
 import { orEmptyObj } from '@/lib/typeUtils';
 
 export const MarketLinks = ({ launchableMarketId }: { launchableMarketId?: string }) => {
-  const { resources } = useAppSelector(getCurrentMarketAssetData, shallowEqual) ?? {};
-  const { coinMarketCapsLink, websiteLink, whitepaperLink } = orEmptyObj(resources);
+  const { urls: marketUrls } = orEmptyObj(
+    useAppSelector(BonsaiHelpers.currentMarket.stableMarketInfo)
+  );
+  const {
+    cmc: coinMarketCapsLink,
+    website: websiteLink,
+    technicalDoc: whitepaperLink,
+  } = orEmptyObj(marketUrls);
+
   const launchableAsset = useMetadataServiceAssetFromId(launchableMarketId);
   const { urls } = orEmptyObj(launchableAsset);
-
-  const { uiRefresh } = testFlags;
 
   const linkItems = [
     {
@@ -44,12 +47,7 @@ export const MarketLinks = ({ launchableMarketId }: { launchableMarketId?: strin
     <div tw="row ml-auto gap-0.5">
       {linkItems.map(
         ({ key, href, icon }) =>
-          href &&
-          (uiRefresh ? (
-            <$IconButton key={key} href={href} iconName={icon} type={ButtonType.Link} />
-          ) : (
-            <IconButton key={key} href={href} iconName={icon} type={ButtonType.Link} />
-          ))
+          href && <$IconButton key={key} href={href} iconName={icon} type={ButtonType.Link} />
       )}
     </div>
   );

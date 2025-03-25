@@ -1,11 +1,7 @@
-import { shallowEqual } from 'react-redux';
+import { BonsaiHelpers } from '@/bonsai/ontology';
+import { OrderSide } from '@dydxprotocol/v4-client-js';
 
-import {
-  AbacusOrderStatus,
-  KotlinIrEnumValues,
-  ORDER_SIDES,
-  ORDER_STATUS_STRINGS,
-} from '@/constants/abacus';
+import { AbacusOrderStatus } from '@/constants/abacus';
 import { STRING_KEYS } from '@/constants/localization';
 import { USD_DECIMALS } from '@/constants/numbers';
 import {
@@ -13,6 +9,7 @@ import {
   PlaceOrderStatuses,
   type LocalPlaceOrderData,
 } from '@/constants/trade';
+import { IndexerOrderSide } from '@/types/indexer/indexerApiGen';
 
 import { useParameterizedSelector } from '@/hooks/useParameterizedSelector';
 import { useStringGetter } from '@/hooks/useStringGetter';
@@ -30,13 +27,12 @@ import {
   getFillByClientId,
   getOrderByClientId,
 } from '@/state/accountSelectors';
-import { useAppSelector } from '@/state/appTypes';
-import { getMarketData } from '@/state/perpetualsSelectors';
 
 import { assertNever } from '@/lib/assertNever';
-import { getTradeType } from '@/lib/orders';
+import { orEmptyObj } from '@/lib/typeUtils';
 
 import { OrderStatusIcon } from '../OrderStatusIcon';
+import { getOrderStatusStringKey } from '../tables/enumToStringKeyHelpers';
 import { FillDetails } from './TradeNotification/FillDetails';
 
 type ElementProps = {
@@ -51,18 +47,23 @@ export const OrderStatusNotification = ({
   const stringGetter = useStringGetter();
   const order = useParameterizedSelector(getOrderByClientId, localOrder.clientId);
   const fill = useParameterizedSelector(getFillByClientId, localOrder.clientId);
-  const marketData = useAppSelector((s) => getMarketData(s, localOrder.marketId), shallowEqual);
+  const marketData = useParameterizedSelector(
+    BonsaiHelpers.markets.createSelectMarketSummaryById,
+    localOrder.marketId
+  );
   const averageFillPrice = useParameterizedSelector(
     getAverageFillPriceForOrder,
     localOrder.orderId
   );
 
-  const { assetId } = marketData ?? {};
+  const { assetId } = orEmptyObj(marketData);
+  const logoUrl = useParameterizedSelector(BonsaiHelpers.assets.createSelectAssetLogo, assetId);
   const { equityTiersLearnMore } = useURLConfigs();
+
+  // force allow the ?. just in case it's not in the map
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   const titleKey = ORDER_TYPE_STRINGS[localOrder.orderType]?.orderTypeKey;
-  const indexedOrderStatus = order?.status?.rawValue as KotlinIrEnumValues<
-    typeof AbacusOrderStatus
-  >;
+  const indexedOrderStatus = order?.status;
   const submissionStatus = localOrder.submissionStatus;
 
   let orderStatusStringKey = STRING_KEYS.SUBMITTING;
@@ -77,28 +78,27 @@ export const OrderStatusNotification = ({
         // skip pending / best effort open state -> still show as submitted (loading)
         if (indexedOrderStatus === AbacusOrderStatus.Pending.rawValue) break;
 
-        orderStatusStringKey = ORDER_STATUS_STRINGS[indexedOrderStatus];
+        orderStatusStringKey = getOrderStatusStringKey(indexedOrderStatus);
         orderStatusIcon = (
           <OrderStatusIcon status={indexedOrderStatus} tw="h-[0.9375rem] w-[0.9375rem]" />
         );
 
-        if (order && fill) {
+        if (fill) {
           customContent = (
             <FillDetails
-              orderSide={ORDER_SIDES[order.side.name]}
-              tradeType={getTradeType(order.type.rawValue) ?? undefined}
+              orderSide={order.side === IndexerOrderSide.BUY ? OrderSide.BUY : OrderSide.SELL}
               filledAmount={order.totalFilled}
               assetId={assetId}
               averagePrice={averageFillPrice ?? order.price}
-              tickSizeDecimals={marketData?.configs?.displayTickSizeDecimals ?? USD_DECIMALS}
+              tickSizeDecimals={marketData?.tickSizeDecimals ?? USD_DECIMALS}
             />
           );
         } else if (
           indexedOrderStatus === AbacusOrderStatus.Canceled.rawValue &&
-          order?.cancelReason
+          order.removalReason
         ) {
           // when there's no fill and has a cancel reason, i.e. just plain canceled
-          const cancelReason = order.cancelReason as keyof typeof STRING_KEYS;
+          const cancelReason = order.removalReason as keyof typeof STRING_KEYS;
           customContent = <span>{stringGetter({ key: STRING_KEYS[cancelReason] })}</span>;
         }
       }
@@ -132,7 +132,7 @@ export const OrderStatusNotification = ({
     <Notification
       isToast={isToast}
       notification={notification}
-      slotIcon={<AssetIcon symbol={assetId} />}
+      slotIcon={<AssetIcon logoUrl={logoUrl} symbol={assetId} />}
       slotTitle={titleKey && stringGetter({ key: titleKey })}
       slotTitleRight={
         <span tw="row gap-[0.5ch] text-color-text-0 font-small-book">

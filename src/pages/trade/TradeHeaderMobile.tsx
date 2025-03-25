@@ -1,10 +1,10 @@
-import { shallowEqual } from 'react-redux';
+import { BonsaiHelpers } from '@/bonsai/ontology';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 
 import { AppRoute } from '@/constants/routes';
 
-import { useMetadataServiceAssetFromId } from '@/hooks/useLaunchableMarkets';
+import { useMetadataServiceAssetFromId } from '@/hooks/useMetadataService';
 
 import { layoutMixins } from '@/styles/layoutMixins';
 
@@ -14,18 +14,21 @@ import { Output, OutputType } from '@/components/Output';
 import { MidMarketPrice } from '@/views/MidMarketPrice';
 
 import { useAppSelector } from '@/state/appTypes';
-import { getCurrentMarketAssetData } from '@/state/assetsSelectors';
-import { getCurrentMarketData } from '@/state/perpetualsSelectors';
 
 import { getDisplayableAssetFromBaseAsset } from '@/lib/assetUtils';
 import { MustBigNumber } from '@/lib/numbers';
+import { orEmptyObj } from '@/lib/typeUtils';
 
 export const TradeHeaderMobile = ({ launchableMarketId }: { launchableMarketId?: string }) => {
-  const { name, id } = useAppSelector(getCurrentMarketAssetData, shallowEqual) ?? {};
+  const id = useAppSelector(BonsaiHelpers.currentMarket.assetId);
+  const name = useAppSelector(BonsaiHelpers.currentMarket.assetName);
+  const imageUrl = useAppSelector(BonsaiHelpers.currentMarket.assetLogo);
+
   const navigate = useNavigate();
 
-  const { displayId, priceChange24H, priceChange24HPercent } =
-    useAppSelector(getCurrentMarketData, shallowEqual) ?? {};
+  const { displayableTicker, priceChange24H, percentChange24h } = orEmptyObj(
+    useAppSelector(BonsaiHelpers.currentMarket.marketInfo)
+  );
 
   const launchableAsset = useMetadataServiceAssetFromId(launchableMarketId);
 
@@ -34,7 +37,7 @@ export const TradeHeaderMobile = ({ launchableMarketId }: { launchableMarketId?:
       <img
         src={launchableAsset.logo}
         alt={launchableAsset.name}
-        tw="h-[2.5rem] w-[2.5rem] border-r-[50%]"
+        tw="h-[2.5rem] w-[2.5rem] rounded-[50%]"
       />
       <$Name>
         <h3>{launchableAsset.name}</h3>
@@ -43,10 +46,10 @@ export const TradeHeaderMobile = ({ launchableMarketId }: { launchableMarketId?:
     </div>
   ) : (
     <div tw="inlineRow gap-[1ch]">
-      <AssetIcon symbol={id} tw="text-[2.5rem]" />
+      <AssetIcon tw="[--asset-icon-size:2.5rem]" logoUrl={imageUrl} symbol={id} />
       <$Name>
         <h3>{name}</h3>
-        <span>{displayId}</span>
+        <span>{displayableTicker}</span>
       </$Name>
     </div>
   );
@@ -61,7 +64,7 @@ export const TradeHeaderMobile = ({ launchableMarketId }: { launchableMarketId?:
         <MidMarketPrice />
         <$PriceChange
           type={OutputType.Percent}
-          value={MustBigNumber(priceChange24HPercent).abs()}
+          value={MustBigNumber(percentChange24h).abs()}
           isNegative={MustBigNumber(priceChange24H).isNegative()}
         />
       </$Right>

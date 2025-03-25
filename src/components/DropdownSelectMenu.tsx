@@ -64,7 +64,7 @@ export const DropdownSelectMenu = <MenuItemValue extends string>({
       {children}
       {!hideIcon && (
         <$DropdownIcon aria-hidden="true">
-          <Icon iconName={IconName.Triangle} aria-hidden="true" />
+          <Icon iconName={IconName.Caret} size="1.5em" aria-hidden="true" />
         </$DropdownIcon>
       )}
     </>
@@ -126,7 +126,6 @@ const $Trigger = styled(Trigger)`
   gap: 1rem;
 
   ${popoverMixins.trigger}
-  ${popoverMixins.backdropOverlay}
 `;
 
 const $DropdownIcon = styled.span`
