@@ -1,3 +1,4 @@
+import { BonsaiHelpers } from '@/bonsai/ontology';
 import { OrderSide } from '@nemo-network/v4-client-js/src';
 import { shallowEqual } from 'react-redux';
 import styled from 'styled-components';
@@ -17,14 +18,17 @@ import { PositionSideTag } from '@/components/PositionSideTag';
 import { WithLabel } from '@/components/WithLabel';
 import { WithTooltip } from '@/components/WithTooltip';
 
-import { getCurrentMarketPositionData } from '@/state/accountSelectors';
+import {
+  getCurrentMarketPositionData,
+  getCurrentMarketPositionDataForPostTrade,
+} from '@/state/accountSelectors';
 import { useAppSelector } from '@/state/appTypes';
 import { getInputTradeData, getInputTradeOptions } from '@/state/inputsSelectors';
-import { getCurrentMarketConfig } from '@/state/perpetualsSelectors';
 
 import abacusStateManager from '@/lib/abacus';
 import { BIG_NUMBERS, MustBigNumber } from '@/lib/numbers';
 import { getSelectedOrderSide, hasPositionSideChanged } from '@/lib/tradeData';
+import { orEmptyObj } from '@/lib/typeUtils';
 
 import { LeverageSlider } from './LeverageSlider';
 
@@ -39,19 +43,22 @@ export const MarketLeverageInput = ({
 }: ElementProps) => {
   const stringGetter = useStringGetter();
 
-  const { initialMarginFraction, effectiveInitialMarginFraction } =
-    useAppSelector(getCurrentMarketConfig, shallowEqual) ?? {};
-  const { leverage, size: currentPositionSize } =
+  const { initialMarginFraction, effectiveInitialMarginFraction } = orEmptyObj(
+    useAppSelector(BonsaiHelpers.currentMarket.stableMarketInfo)
+  );
+  const { leverage: currentLeverage, signedSize: currentSize } =
     useAppSelector(getCurrentMarketPositionData, shallowEqual) ?? {};
+  const { size: postPositionSize, leverage: postPositionLeverage } =
+    useAppSelector(getCurrentMarketPositionDataForPostTrade) ?? {};
   const { side } = useAppSelector(getInputTradeData, shallowEqual) ?? {};
   const { maxLeverage } = useAppSelector(getInputTradeOptions, shallowEqual) ?? {};
 
-  const { current: currentSize, postOrder: postOrderSize } = currentPositionSize ?? {};
-  const { current: currentLeverage, postOrder: postOrderLeverage } = leverage ?? {};
+  const { postOrder: postOrderSize } = postPositionSize ?? {};
+  const { postOrder: postOrderLeverage } = postPositionLeverage ?? {};
 
   const orderSide = getSelectedOrderSide(side);
   const { currentPositionSide, newPositionSide } = hasPositionSideChanged({
-    currentSize,
+    currentSize: currentSize?.toNumber(),
     postOrderSize,
   });
 

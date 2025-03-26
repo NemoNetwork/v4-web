@@ -7,6 +7,7 @@ import { ButtonAction, ButtonShape, ButtonSize } from '@/constants/buttons';
 import { STRING_KEYS } from '@/constants/localization';
 import { type MenuItem } from '@/constants/menus';
 
+import { useBreakpoints } from '@/hooks/useBreakpoints';
 import { useStringGetter } from '@/hooks/useStringGetter';
 
 import { layoutMixins } from '@/styles/layoutMixins';
@@ -25,7 +26,7 @@ type ElementProps = {
   pages: MenuItem<string>[];
   totalRows: number;
   setCurrentPage: Dispatch<SetStateAction<number>>;
-  setPageSize: Dispatch<SetStateAction<PageSize>>;
+  setPageSize: (val: PageSize) => void;
 };
 
 export const TablePaginationRow = ({
@@ -37,6 +38,7 @@ export const TablePaginationRow = ({
   setPageSize,
 }: ElementProps) => {
   const stringGetter = useStringGetter();
+  const { isNotMobile } = useBreakpoints();
 
   const pageNumberToDisplay = (pageNumber: number) => String(pageNumber + 1);
   const pageToggles = () => {
@@ -59,6 +61,7 @@ export const TablePaginationRow = ({
           value={pageNumberToDisplay(currentPage)}
           items={pages}
           onValueChange={(pageNumber: string) => setCurrentPage(Number(pageNumber) - 1)}
+          truncateLabel={false}
         />
         <IconButton
           {...buttonProps}
@@ -95,14 +98,15 @@ export const TablePaginationRow = ({
 
   return (
     <$PaginationRow>
-      {stringGetter({
-        key: STRING_KEYS.SHOWING_NUM_OUT_OF_TOTAL,
-        params: {
-          START: currentPage * pageSize + 1,
-          END: Math.min((currentPage + 1) * pageSize, totalRows),
-          TOTAL: totalRows,
-        },
-      })}
+      {isNotMobile &&
+        stringGetter({
+          key: STRING_KEYS.SHOWING_NUM_OUT_OF_TOTAL,
+          params: {
+            START: currentPage * pageSize + 1,
+            END: Math.min((currentPage + 1) * pageSize, totalRows),
+            TOTAL: totalRows,
+          },
+        })}
       {pageToggles()}
       {pageSizeSelector()}
     </$PaginationRow>
@@ -114,6 +118,8 @@ const $InlineRow = tw.div`inlineRow`;
 const $PaginationRow = styled.div`
   ${layoutMixins.spacedRow}
   padding: var(--tableCell-padding);
+  max-width: 100vw;
+  overflow-x: auto;
 `;
 
 const $ToggleGroup = styled(ToggleGroup)`

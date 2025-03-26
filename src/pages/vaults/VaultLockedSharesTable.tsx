@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 
+import { VaultShareUnlock } from '@/bonsai/public-calculators/vaultAccount';
 import { sum } from 'lodash';
 import styled from 'styled-components';
 
-import { VaultShareUnlock } from '@/constants/abacus';
 import { ButtonShape, ButtonSize } from '@/constants/buttons';
 import { STRING_KEYS } from '@/constants/localization';
+import { timeUnits } from '@/constants/time';
 
 import { useApiState } from '@/hooks/useApiState';
 import { useStringGetter } from '@/hooks/useStringGetter';
@@ -24,7 +25,7 @@ export const VaultLockedSharesCard = ({ className }: { className?: string }) => 
   const [showShares, setShowShares] = useState(false);
   const vaultAccount = useLoadedVaultAccount().data;
   const rawLockedShares = vaultAccount?.vaultShareUnlocks;
-  const lockedShares = useMemo(() => rawLockedShares?.toArray(), [rawLockedShares]);
+  const lockedShares = useMemo(() => rawLockedShares, [rawLockedShares]);
   const lockedSharesTotalValue = useMemo(
     () => sum(lockedShares?.map((s) => s.amountUsdc)),
     [lockedShares]
@@ -37,7 +38,7 @@ export const VaultLockedSharesCard = ({ className }: { className?: string }) => 
     <div className={className} tw="rounded-[0.7rem] border border-solid border-color-border">
       <div tw="flex justify-between px-1 py-0.625">
         <div tw="flex gap-0.5">
-          <h3 tw="pt-[5px]">Locked Balance</h3>
+          <h3 tw="pt-[5px]">{stringGetter({ key: STRING_KEYS.LOCKED_BALANCE })}</h3>
           <span tw="text-color-text-0">
             <Output value={lockedSharesTotalValue} type={OutputType.CompactFiat} />
           </span>
@@ -78,7 +79,8 @@ const VaultLockedSharesTable = ({
             const estimatedUnlockMs = mapIfPresent(
               unlockBlockHeight,
               height,
-              (unblock, actual) => new Date().valueOf() + (unblock - actual) * 1000
+              // add a day so users don't get confused about why their money isn't unlocked when the day arrives
+              (unblock, actual) => new Date().valueOf() + (unblock - actual) * 1000 + timeUnits.day
             );
             return (
               <Output
@@ -102,6 +104,7 @@ const VaultLockedSharesTable = ({
     <$Table
       withInnerBorders
       data={lockedShares}
+      tableId="vault-locked-shares"
       getRowKey={(row) => `${row.amountUsdc ?? ''}${row.unlockBlockHeight ?? ''}`}
       label={stringGetter({ key: STRING_KEYS.MEGAVAULT })}
       defaultSortDescriptor={{

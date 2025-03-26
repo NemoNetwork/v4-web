@@ -1,27 +1,31 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { SubaccountOrder } from '@/bonsai/types/summaryTypes';
+import { OrderSide } from '@nemo-network/v4-client-js/src';
 import { IOrderLineAdapter } from 'public/tradingview/charting_library';
 import { shallowEqual } from 'react-redux';
 import tw from 'twin.macro';
 
-import { HumanReadablePlaceOrderPayload, ORDER_SIDES, SubaccountOrder } from '@/constants/abacus';
+import { HumanReadablePlaceOrderPayload } from '@/constants/abacus';
 import { AnalyticsEvents } from '@/constants/analytics';
 import { TOGGLE_ACTIVE_CLASS_NAME } from '@/constants/charts';
 import { DEFAULT_SOMETHING_WENT_WRONG_ERROR_PARAMS } from '@/constants/errors';
 import { STRING_KEYS } from '@/constants/localization';
-import { StatsigFlags } from '@/constants/statsig';
-import { ORDER_TYPE_STRINGS, TradeTypes, type OrderType } from '@/constants/trade';
+import { ORDER_TYPE_STRINGS, TradeTypes } from '@/constants/trade';
 import type { ChartLine, PositionLineType, TvWidget } from '@/constants/tvchart';
+import { IndexerOrderSide } from '@/types/indexer/indexerApiGen';
 
 import { Icon, IconName } from '@/components/Icon';
 
 import {
   getCurrentMarketOrders,
+  getCurrentMarketOrdersForPostOrder,
   getCurrentMarketPositionData,
   getIsAccountConnected,
 } from '@/state/accountSelectors';
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
-import { getAppColorMode, getAppTheme } from '@/state/configsSelectors';
+import { getAppColorMode, getAppTheme } from '@/state/appUiConfigsSelectors';
+import { getCurrentMarketId } from '@/state/currentMarketSelectors';
 import {
   cancelOrderFailed,
   cancelOrderSubmitted,
@@ -29,7 +33,6 @@ import {
   placeOrderSubmitted,
   setLatestOrder,
 } from '@/state/localOrders';
-import { getCurrentMarketId } from '@/state/perpetualsSelectors';
 
 import abacusStateManager from '@/lib/abacus';
 import { track } from '@/lib/analytics/analytics';
@@ -40,11 +43,10 @@ import {
   createPlaceOrderPayloadFromExistingOrder,
   getOrderModificationError,
 } from '@/lib/orderModification';
-import { isOrderStatusOpen } from '@/lib/orders';
+import { isNewOrderStatusOpen } from '@/lib/orders';
 import { getChartLineColors } from '@/lib/tradingView/utils';
 
 import { useCustomNotification } from '../useCustomNotification';
-import { useStatsigGateValue } from '../useStatsig';
 import { useStringGetter } from '../useStringGetter';
 
 const CHART_LINE_FONT = 'bold 10px Satoshi';
@@ -56,12 +58,10 @@ const CHART_LINE_FONT = 'bold 10px Satoshi';
 export const useChartLines = ({
   tvWidget,
   orderLineToggle,
-  isChartReady,
   orderLinesToggleOn,
 }: {
-  tvWidget: TvWidget | null;
+  tvWidget?: TvWidget;
   orderLineToggle: HTMLElement | null;
-  isChartReady: boolean;
   orderLinesToggleOn: boolean;
 }) => {
   const [initialWidget, setInitialWidget] = useState<TvWidget | null>(null);
@@ -83,8 +83,10 @@ export const useChartLines = ({
     getCurrentMarketOrders,
     shallowEqual
   );
-
-  const canModifyOrdersFromChart = useStatsigGateValue(StatsigFlags.ffOrderModificationFromChart);
+  const currentMarketOrdersAbacus = useAppSelector(
+    getCurrentMarketOrdersForPostOrder,
+    shallowEqual
+  );
 
   const runOnChartReady = useCallback(
     (callback: () => void) => {
@@ -195,9 +197,9 @@ export const useChartLines = ({
       return;
     }
 
-    const entryPrice = currentMarketPositionData.entryPrice?.current;
-    const liquidationPrice = currentMarketPositionData.liquidationPrice?.current;
-    const size = currentMarketPositionData.size?.current;
+    const entryPrice = currentMarketPositionData.entryPrice.toNumber();
+    const liquidationPrice = currentMarketPositionData.liquidationPrice?.toNumber();
+    const size = currentMarketPositionData.signedSize.toNumber();
 
     maybeDrawPositionLine({
       key: entryLineKey,
@@ -242,7 +244,7 @@ export const useChartLines = ({
     async (order: SubaccountOrder, orderLine?: IOrderLineAdapter) => {
       if (!orderLine || !canModifyOrderTypeFromChart(order)) return;
 
-      const oldPrice = order.triggerPrice ?? order.price;
+      const oldPrice = (order.triggerPrice ?? order.price).toNumber();
       const newPrice = orderLine.getPrice();
 
       const priceError = getOrderModificationError(order, newPrice);
@@ -319,23 +321,26 @@ export const useChartLines = ({
 
   const updateOrderLines = useCallback(() => {
     const pendingOrderAdjustments = pendingOrderAdjustmentsRef.current;
-    // We don't need to worry about clearing chart lines for cancelled market orders since they will persist in
-    // currentMarketOrders, just with a cancelReason
-    if (!currentMarketOrders) {
-      return;
-    }
-
+    const currentKeys = new Set<string>();
     currentMarketOrders.forEach((order) => {
-      const { id, type, status, side, cancelReason, size, triggerPrice, price, trailingPercent } =
-        order;
+      const {
+        id,
+        type,
+        status,
+        side,
+        removalReason: cancelReason,
+        size,
+        triggerPrice,
+        price,
+      } = order;
       const key = id;
       const quantity = size.toString();
 
-      const orderType = type.rawValue as OrderType;
+      const orderType = type;
       const orderLabel = stringGetter({
         key: ORDER_TYPE_STRINGS[orderType].orderTypeKey,
       });
-      const orderString = trailingPercent ? `${orderLabel} ${trailingPercent}%` : orderLabel;
+      const orderString = orderLabel;
 
       const pendingReplacementOrder = Object.values(pendingOrderAdjustments).find(
         (adjustment) => adjustment.oldOrderId === id
@@ -347,7 +352,7 @@ export const useChartLines = ({
       // For orders that are modified on the chart, keep showing the canceled order (with the new price) until the new order is successfully placed
       const shouldShow =
         (!!pendingReplacementOrder && !replacementOrderPlaced) ||
-        (!cancelReason && isOrderStatusOpen(status));
+        (!cancelReason && status != null && isNewOrderStatusOpen(status));
 
       const maybeOrderLine = chartLinesRef.current[key]?.line;
 
@@ -363,6 +368,7 @@ export const useChartLines = ({
           delete chartLinesRef.current[key];
         }
       } else {
+        currentKeys.add(key);
         if (maybeOrderLine) {
           if (maybeOrderLine.getPrice() !== formattedPrice) {
             maybeOrderLine.setPrice(formattedPrice);
@@ -381,12 +387,12 @@ export const useChartLines = ({
           if (orderLine) {
             const chartLine: ChartLine = {
               line: orderLine,
-              chartLineType: ORDER_SIDES[side.name],
+              chartLineType: side === IndexerOrderSide.BUY ? OrderSide.BUY : OrderSide.SELL,
             };
             setLineColorsAndFont({ chartLine });
             chartLinesRef.current[key] = chartLine;
           }
-          if (canModifyOrdersFromChart && canModifyOrderTypeFromChart(order)) {
+          if (canModifyOrderTypeFromChart(order)) {
             orderLine?.onMove(() => onMoveOrderLine(order, orderLine));
           }
 
@@ -397,16 +403,25 @@ export const useChartLines = ({
               AnalyticsEvents.TradingViewOrderModificationSuccess({ clientId: order.clientId })
             );
             removePendingOrderAdjustment(order.clientId);
-            dispatch(setLatestOrder(order));
+            dispatch(setLatestOrder(currentMarketOrdersAbacus.find((o) => o.id === order.id)));
           }
         }
       }
     });
+
+    // remove chart lines that we don't see in the open orders array
+    Object.entries(chartLinesRef.current)
+      .filter(([_e, c]) => c.chartLineType === OrderSide.BUY || c.chartLineType === OrderSide.SELL)
+      .filter(([key]) => !currentKeys.has(key))
+      .forEach(([key, line]) => {
+        line.line.remove();
+        delete chartLinesRef.current[key];
+      });
   }, [
     currentMarketOrders,
+    currentMarketOrdersAbacus,
     stringGetter,
     tvWidget,
-    canModifyOrdersFromChart,
     setLineColorsAndFont,
     onMoveOrderLine,
     dispatch,
@@ -420,58 +435,62 @@ export const useChartLines = ({
   }, []);
 
   const drawChartLines = useCallback(() => {
-    if (orderLinesToggleOn) {
+    if (orderLinesToggleOn && isAccountConnected) {
       updateOrderLines();
       updatePositionLines();
     } else {
       clearChartLines();
     }
-  }, [updatePositionLines, updateOrderLines, clearChartLines, orderLinesToggleOn]);
+  }, [
+    updatePositionLines,
+    updateOrderLines,
+    clearChartLines,
+    orderLinesToggleOn,
+    isAccountConnected,
+  ]);
 
   // Effects
 
   useEffect(
     // Update display button on toggle
     () => {
-      if (isChartReady) {
-        runOnChartReady(() => {
-          if (orderLinesToggleOn) {
-            orderLineToggle?.classList?.add(TOGGLE_ACTIVE_CLASS_NAME);
-          } else {
-            orderLineToggle?.classList?.remove(TOGGLE_ACTIVE_CLASS_NAME);
-          }
-        });
-      }
+      runOnChartReady(() => {
+        if (orderLinesToggleOn) {
+          orderLineToggle?.classList.add(TOGGLE_ACTIVE_CLASS_NAME);
+        } else {
+          orderLineToggle?.classList.remove(TOGGLE_ACTIVE_CLASS_NAME);
+        }
+      });
     },
-    [orderLinesToggleOn, orderLineToggle, runOnChartReady, isChartReady]
+    [orderLinesToggleOn, orderLineToggle, runOnChartReady]
   );
 
   useEffect(
     () => {
-      if (isChartReady && tvWidget) {
-        // Manual call to draw chart lines on initial render of chart
-        if (!initialWidget) {
-          runOnChartReady(drawChartLines);
-          setInitialWidget(tvWidget);
-          setLastMarket(currentMarketId);
-        } else if (currentMarketId && lastMarket !== currentMarketId) {
-          // Subscribe to update chart lines whenever market (symbol) has changed
-          tvWidget
-            .activeChart()
-            .onSymbolChanged()
-            .subscribe(
-              null,
-              () => {
-                runOnChartReady(drawChartLines);
-              },
-              true
-            );
-          setLastMarket(currentMarketId);
-        } else {
-          // Update chart lines if market has not changed. If the market has changed, we want the chart lines to be handled by the subscribe so
-          // that it is guaranteed to run after the tick size of the market has been updated.
-          runOnChartReady(drawChartLines);
-        }
+      if (!tvWidget) return;
+
+      // Manual call to draw chart lines on initial render of chart
+      if (!initialWidget) {
+        runOnChartReady(drawChartLines);
+        setInitialWidget(tvWidget);
+        setLastMarket(currentMarketId);
+      } else if (currentMarketId && lastMarket !== currentMarketId) {
+        // Subscribe to update chart lines whenever market (symbol) has changed
+        tvWidget
+          .activeChart()
+          .onSymbolChanged()
+          .subscribe(
+            null,
+            () => {
+              runOnChartReady(drawChartLines);
+            },
+            true
+          );
+        setLastMarket(currentMarketId);
+      } else {
+        // Update chart lines if market has not changed. If the market has changed, we want the chart lines to be handled by the subscribe so
+        // that it is guaranteed to run after the tick size of the market has been updated.
+        runOnChartReady(drawChartLines);
       }
     },
     // We intentionally do not want the hook to re-run when lastMarket is updated since it is set in the subscribe condition; only the
@@ -480,27 +499,11 @@ export const useChartLines = ({
     [
       initialWidget,
       tvWidget,
-      isChartReady,
       currentMarketId,
       // lastMarket,
       drawChartLines,
       runOnChartReady,
     ]
-  );
-
-  useEffect(
-    () => {
-      if (initialWidget && !isChartReady) {
-        // Clear lines when chart switches to not ready after initialization (i.e. when orderbookCandles is toggled)
-        clearChartLines();
-      } else if (!isAccountConnected) {
-        // Clear lines when disconnecting account
-        clearChartLines();
-      }
-    },
-    // We intentionally avoid rerunning this hook on update of initialWidget
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isChartReady, clearChartLines, isAccountConnected]
   );
 
   useEffect(() => {

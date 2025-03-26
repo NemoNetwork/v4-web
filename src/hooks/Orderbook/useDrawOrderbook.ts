@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { shallowEqual } from 'react-redux';
+import { BonsaiHelpers } from '@/bonsai/ontology';
+import { CanvasOrderbookLine } from '@/bonsai/types/orderbookTypes';
 
-import type { PerpetualMarketOrderbookLevel } from '@/constants/abacus';
 import { SMALL_USD_DECIMALS, TOKEN_DECIMALS } from '@/constants/numbers';
 import {
   ORDERBOOK_ANIMATION_DURATION,
@@ -19,9 +19,9 @@ import { OutputType, formatNumberOutput } from '@/components/Output';
 
 import { useAppSelector } from '@/state/appTypes';
 import { getSelectedLocale } from '@/state/localizationSelectors';
-import { getCurrentMarketConfig, getCurrentMarketOrderbookMap } from '@/state/perpetualsSelectors';
 
 import { getConsistentAssetSizeString } from '@/lib/consistentAssetSize';
+import { MaybeBigNumber } from '@/lib/numbers';
 import {
   getHistogramXValues,
   getRektFromIdx,
@@ -34,9 +34,9 @@ import { orEmptyObj } from '@/lib/typeUtils';
 import { useLocaleSeparators } from '../useLocaleSeparators';
 
 type ElementProps = {
-  data: Array<PerpetualMarketOrderbookLevel | undefined>;
+  data: Array<CanvasOrderbookLine | undefined>;
   histogramRange: number;
-  side: PerpetualMarketOrderbookLevel['side'];
+  side: CanvasOrderbookLine['side'];
   displayUnit: DisplayUnit;
 };
 
@@ -62,14 +62,21 @@ export const useDrawOrderbook = ({
 }: ElementProps & StyleProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const canvas = canvasRef.current;
-  const currentOrderbookMap = useAppSelector(getCurrentMarketOrderbookMap, shallowEqual);
+  const priceSizeMap = data.reduce(
+    (acc, row) => {
+      if (!row) return acc;
+      acc[row.price.toString()] = row.size;
+      return acc;
+    },
+    {} as Record<string, number>
+  );
   const { decimal: decimalSeparator, group: groupSeparator } = useLocaleSeparators();
   const selectedLocale = useAppSelector(getSelectedLocale);
 
-  const marketConfig = orEmptyObj(useAppSelector(getCurrentMarketConfig));
+  const marketConfig = orEmptyObj(useAppSelector(BonsaiHelpers.currentMarket.stableMarketInfo));
   const stepSizeDecimals = marketConfig.stepSizeDecimals ?? TOKEN_DECIMALS;
   const tickSizeDecimals = marketConfig.tickSizeDecimals ?? SMALL_USD_DECIMALS;
-  const stepSize = marketConfig.stepSize ?? 10 ** (-1 * TOKEN_DECIMALS);
+  const stepSize = MaybeBigNumber(marketConfig.stepSize)?.toNumber() ?? 10 ** (-1 * TOKEN_DECIMALS);
   const prevData = useRef<typeof data>(data);
   const theme = useAppThemeAndColorModeContext();
 
@@ -244,6 +251,7 @@ export const useDrawOrderbook = ({
             groupSeparator,
             selectedLocale,
             fractionDigits: tickSizeDecimals,
+            withSubscript: true,
           }),
           getXByColumn({ canvasWidth, colIdx: 0 }) - ORDERBOOK_ROW_PADDING_RIGHT,
           y
@@ -322,7 +330,7 @@ export const useDrawOrderbook = ({
     }: {
       ctx: CanvasRenderingContext2D;
       idx: number;
-      rowToRender?: PerpetualMarketOrderbookLevel;
+      rowToRender?: CanvasOrderbookLine;
       animationType?: OrderbookRowAnimationType;
     }) => {
       if (!rowToRender) return;
@@ -355,7 +363,7 @@ export const useDrawOrderbook = ({
       drawText({
         animationType,
         ctx,
-        depth: depth ?? undefined,
+        depth,
         depthCost,
         sizeCost,
         price,
@@ -394,14 +402,12 @@ export const useDrawOrderbook = ({
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
     // Animate row removal (do not animate update)
-    const mapOfOrderbookPriceLevels =
-      side && currentOrderbookMap?.[side === 'ask' ? 'asks' : 'bids'];
 
     prevData.current.forEach((row, idx) => {
       if (!row) return;
 
       const animationType =
-        mapOfOrderbookPriceLevels?.[row.price] === 0
+        priceSizeMap[row.price] == null
           ? OrderbookRowAnimationType.REMOVE
           : OrderbookRowAnimationType.NONE;
 
@@ -425,7 +431,7 @@ export const useDrawOrderbook = ({
     histogramSide,
     side,
     theme,
-    currentOrderbookMap,
+    priceSizeMap,
     displayUnit,
     canvas,
     drawOrderbookRow,

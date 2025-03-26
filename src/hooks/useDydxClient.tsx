@@ -8,6 +8,7 @@ import {
   IndexerConfig,
   LocalWallet,
   Network,
+  PnlTickInterval,
   SelectedGasDenom,
   ValidatorConfig,
   onboarding,
@@ -18,7 +19,7 @@ import type { ResolutionString } from 'public/tradingview/charting_library';
 import type { ConnectNetworkEvent, NetworkConfig } from '@/constants/abacus';
 import { RawSubaccountFill, RawSubaccountTransfer } from '@/constants/account';
 import { DEFAULT_TRANSACTION_MEMO } from '@/constants/analytics';
-import { RESOLUTION_MAP, type Candle } from '@/constants/candles';
+import { RESOLUTION_MAP, RESOLUTION_TO_INTERVAL_MS, type Candle } from '@/constants/candles';
 import { LocalStorageKey } from '@/constants/localStorage';
 import { isDev } from '@/constants/networks';
 
@@ -42,6 +43,10 @@ export const DydxProvider = ({ ...props }) => (
 );
 
 export const useDydxClient = () => useContext(DydxContext);
+
+const DEFAULT_PAGE_SIZE_TARGET = 1000;
+// parallel requests should be limited to prevent hitting 429 errors and failing the whole operation
+const DEFAULT_MAX_REQUESTS = 20;
 
 const useDydxClientContext = () => {
   // ------ Network ------ //
@@ -75,9 +80,9 @@ const useDydxClientContext = () => {
     (async () => {
       if (
         networkConfig?.chainId &&
-        networkConfig?.indexerUrl &&
-        networkConfig?.websocketUrl &&
-        networkConfig?.validatorUrl
+        networkConfig.indexerUrl &&
+        networkConfig.websocketUrl &&
+        networkConfig.validatorUrl
       ) {
         try {
           const initializedClient = await CompositeClient.connect(
@@ -98,7 +103,8 @@ const useDydxClientContext = () => {
                   broadcastPollIntervalMs: 3_000,
                   broadcastTimeoutMs: 60_000,
                 },
-                DEFAULT_TRANSACTION_MEMO
+                DEFAULT_TRANSACTION_MEMO,
+                false
               )
             )
           );
@@ -144,7 +150,7 @@ const useDydxClientContext = () => {
   }, [compositeClient, setSelectedGasDenom]);
 
   // ------ Wallet Methods ------ //
-  const getWalletFromSignature = async ({ signature }: { signature: string }) => {
+  const getWalletFromSignature = useCallback(async ({ signature }: { signature: string }) => {
     const { mnemonic, privateKey, publicKey } =
       // This method should be renamed to deriveHDKeyFromSignature as it is used for both solana and ethereum signatures
       onboarding.deriveHDKeyFromEthereumSignature(signature);
@@ -155,7 +161,7 @@ const useDydxClientContext = () => {
       privateKey,
       publicKey,
     };
-  };
+  }, []);
 
   // ------ Public Methods ------ //
   const requestAllPerpetualMarkets = async () => {
@@ -168,14 +174,17 @@ const useDydxClientContext = () => {
     }
   };
 
-  const getMegavaultHistoricalPnl = useCallback(async () => {
-    try {
-      return await indexerClient.vault.getMegavaultHistoricalPnl();
-    } catch (error) {
-      log('useDydxClient/getMegavaultHistoricalPnl', error);
-      return undefined;
-    }
-  }, [indexerClient.vault]);
+  const getMegavaultHistoricalPnl = useCallback(
+    async (resolution: PnlTickInterval = PnlTickInterval.day) => {
+      try {
+        return await indexerClient.vault.getMegavaultHistoricalPnl(resolution);
+      } catch (error) {
+        log('useDydxClient/getMegavaultHistoricalPnl', error);
+        return undefined;
+      }
+    },
+    [indexerClient.vault]
+  );
 
   const getMegavaultPositions = useCallback(async () => {
     try {
@@ -248,7 +257,7 @@ const useDydxClientContext = () => {
         subaccountNumber,
         undefined,
         undefined,
-        100,
+        DEFAULT_PAGE_SIZE_TARGET,
         undefined,
         undefined,
         1
@@ -260,7 +269,7 @@ const useDydxClientContext = () => {
           length: Math.ceil(totalResults / pageSize) - 1,
         },
         (_, index) => index + 2
-      );
+      ).slice(0, DEFAULT_MAX_REQUESTS);
 
       const results = await Promise.all(
         pages.map((page) =>
@@ -269,7 +278,7 @@ const useDydxClientContext = () => {
             subaccountNumber,
             undefined,
             undefined,
-            100,
+            pageSize,
             undefined,
             undefined,
             page
@@ -298,7 +307,7 @@ const useDydxClientContext = () => {
       } = await indexerClient.account.getParentSubaccountNumberTransfers(
         address,
         subaccountNumber,
-        100,
+        DEFAULT_PAGE_SIZE_TARGET,
         undefined,
         undefined,
         1
@@ -310,14 +319,14 @@ const useDydxClientContext = () => {
           length: Math.ceil(totalResults / pageSize) - 1,
         },
         (_, index) => index + 2
-      );
+      ).slice(0, DEFAULT_MAX_REQUESTS);
 
       const results = await Promise.all(
         pages.map((page) =>
           indexerClient.account.getParentSubaccountNumberTransfers(
             address,
             subaccountNumber,
-            100,
+            pageSize,
             undefined,
             undefined,
             page
@@ -385,7 +394,7 @@ const useDydxClientContext = () => {
       const { candles } =
         (await indexerClient.markets.getPerpetualMarketCandles(
           marketId,
-          RESOLUTION_MAP[resolution],
+          RESOLUTION_MAP[resolution]!,
           fromIso,
           toIso,
           limit
@@ -412,7 +421,7 @@ const useDydxClientContext = () => {
     let toIso = new Date(toMs).toISOString();
     const candlesInRange: Candle[] = [];
 
-    // eslint-disable-next-line no-constant-condition
+    // eslint-disable-next-line no-constant-condition, @typescript-eslint/no-unnecessary-condition
     while (true) {
       // eslint-disable-next-line no-await-in-loop
       const candles = await requestCandles({
@@ -422,6 +431,7 @@ const useDydxClientContext = () => {
         toIso,
       });
 
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (!candles || candles.length === 0) {
         break;
       }
@@ -430,10 +440,11 @@ const useDydxClientContext = () => {
       const length = candlesInRange.length;
 
       if (length) {
-        const oldestTime = new Date(candlesInRange[length - 1].startedAt).getTime();
+        const oldestTime = new Date(candlesInRange.at(-1)!.startedAt).getTime();
 
-        if (oldestTime > fromMs) {
-          toIso = candlesInRange[length - 1].startedAt;
+        // don't retry if gap is smaller than resolution
+        if (oldestTime - fromMs > RESOLUTION_TO_INTERVAL_MS[resolution]!) {
+          toIso = candlesInRange.at(-1)!.startedAt;
         } else {
           break;
         }
@@ -453,7 +464,7 @@ const useDydxClientContext = () => {
     const results = await Promise.all(promises);
 
     const screenedAddresses = Object.fromEntries(
-      addresses.map((address, index) => [address, results[index]?.restricted])
+      addresses.map((address, index) => [address, !!results[index]?.restricted])
     );
 
     updateSanctionedAddresses(screenedAddresses);
@@ -496,6 +507,11 @@ const useDydxClientContext = () => {
     [compositeClient]
   );
 
+  const getAllAffiliateTiers = useCallback(async () => {
+    const tiers = await compositeClient?.validatorClient.get.getAllAffiliateTiers();
+    return tiers?.tiers?.tiers;
+  }, [compositeClient]);
+
   const getReferredBy = useCallback(
     async (address: string) => {
       return undefined; //
@@ -535,6 +551,7 @@ const useDydxClientContext = () => {
     getValidators,
     getAccountBalance,
     getAffiliateInfo,
+    getAllAffiliateTiers,
     getReferredBy,
 
     // vault methods

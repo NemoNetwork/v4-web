@@ -60,8 +60,8 @@ type ElementProps<Datum extends {}> = {
   > &
     Pick<ThresholdProps<Datum>, 'curve'> & {
       colorAccessor: GlyphSeriesProps<Datum>['colorAccessor'];
-      xAccessor: (_: Datum) => number;
-      yAccessor: (_: Datum) => number;
+      xAccessor: (_: Datum | undefined) => number;
+      yAccessor: (_: Datum | undefined) => number;
       getCurve?: (_: { zoom: number; zoomDomain: number }) => ThresholdProps<Datum>['curve']; // LineSeriesProps<Datum>['curve'];
       glyphSize?: GlyphSeriesProps<Datum>['size'];
       getGlyphSize?: (_: { datum: Datum; zoom: number }) => number;
@@ -137,10 +137,11 @@ export const TimeSeriesChart = <Datum extends {}>({
   const chartRef = useRef<HTMLDivElement>(null);
 
   // Chart data
-  const { xAccessor, yAccessor } = series[0];
+  const { xAccessor, yAccessor } = series[0]!;
 
-  const earliestDatum = data?.[0];
-  const latestDatum = data?.[data.length - 1];
+  const atLeastOnePoint = data.length > 0;
+  const earliestDatum = data[0];
+  const latestDatum = data[data.length - 1];
 
   // Chart state
   const getClampedZoomDomain = useCallback(
@@ -148,7 +149,7 @@ export const TimeSeriesChart = <Datum extends {}>({
       return clamp(
         Math.max(1e-320, Math.min(Number.MAX_SAFE_INTEGER, unclamped)),
         minZoomDomain,
-        xAccessor(latestDatum) - xAccessor(earliestDatum)
+        atLeastOnePoint ? xAccessor(latestDatum!) - xAccessor(earliestDatum!) : 0
       );
     },
     [earliestDatum, latestDatum, minZoomDomain, xAccessor]
@@ -160,7 +161,7 @@ export const TimeSeriesChart = <Datum extends {}>({
         return getClampedZoomDomain(defaultZoomDomain);
       }
       if (latestDatum != null && earliestDatum != null) {
-        return xAccessor(latestDatum) - xAccessor(earliestDatum);
+        return getClampedZoomDomain(xAccessor(latestDatum) - xAccessor(earliestDatum));
       }
       return minZoomDomain;
     })()
@@ -168,13 +169,27 @@ export const TimeSeriesChart = <Datum extends {}>({
 
   const [zoomDomainAnimateTo, setZoomDomainAnimateTo] = useState<number | undefined>();
 
+  // handle someone changing defaultZoomDomain
   useEffect(() => {
     if (defaultZoomDomain) {
       const clampedZoomDomain = getClampedZoomDomain(defaultZoomDomain);
       setZoomDomain(clampedZoomDomain);
       setZoomDomainAnimateTo(clampedZoomDomain);
     }
-  }, [defaultZoomDomain, getClampedZoomDomain]);
+  }, [defaultZoomDomain]);
+
+  // Handle data changing somehow
+  useEffect(() => {
+    // hack: if we are zoomed all the way in, it's probably because there was no data before, let's use default
+    const zoomDomainToUse =
+      zoomDomain === minZoomDomain ? defaultZoomDomain : zoomDomain ?? defaultZoomDomain ?? null;
+
+    if (zoomDomainToUse) {
+      const clampedZoomDomain = getClampedZoomDomain(zoomDomainToUse);
+      setZoomDomain(clampedZoomDomain);
+      setZoomDomainAnimateTo(clampedZoomDomain);
+    }
+  }, [getClampedZoomDomain]);
 
   useEffect(() => {
     onZoom?.({ zoomDomain });
@@ -211,10 +226,18 @@ export const TimeSeriesChart = <Datum extends {}>({
 
     const zoom = zoomDomain / minZoomDomain;
 
-    const domainBase = [
-      clamp(xAccessor(latestDatum) - zoomDomain, xAccessor(earliestDatum), xAccessor(latestDatum)),
-      xAccessor(latestDatum),
-    ] as [number, number];
+    const domainBase = (
+      atLeastOnePoint
+        ? [
+            clamp(
+              xAccessor(latestDatum!) - zoomDomain,
+              xAccessor(earliestDatum!),
+              xAccessor(latestDatum!)
+            ),
+            xAccessor(latestDatum!),
+          ]
+        : [0, 0]
+    ) as [number, number];
     const domain = [
       domainBase[0] - (domainBase[1] - domainBase[0]) * domainBasePadding[0],
       domainBase[1] + (domainBase[1] - domainBase[0]) * domainBasePadding[1],
@@ -295,6 +318,10 @@ export const TimeSeriesChart = <Datum extends {}>({
                 const numTicksY =
                   (height - (margin?.top ?? 0) - (margin?.bottom ?? 0)) / tickSpacingY;
 
+                if (width === 0 || height === 0) {
+                  return null;
+                }
+
                 return (
                   <XYChart margin={margin} width={width} height={height}>
                     <Grid
@@ -361,8 +388,8 @@ export const TimeSeriesChart = <Datum extends {}>({
                           colorAccessor={
                             childSeries.threshold ? () => 'transparent' : childSeries.colorAccessor
                           }
-                          onPointerMove={childSeries?.onPointerMove}
-                          onPointerOut={childSeries?.onPointerOut}
+                          onPointerMove={childSeries.onPointerMove}
+                          onPointerOut={childSeries.onPointerOut}
                         />
 
                         {(childSeries.glyphSize ?? childSeries.getGlyphSize) && (

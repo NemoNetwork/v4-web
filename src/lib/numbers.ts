@@ -8,11 +8,52 @@ export type LocaleSeparators = { group?: string; decimal?: string };
 export const BIG_NUMBERS = {
   ZERO: new BigNumber(0),
   ONE: new BigNumber(1),
+  TEN: new BigNumber(10),
 };
 
+// defaults to zero if null or empty
 export const MustBigNumber = (amount?: BigNumberish | null): BigNumber =>
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
   new BigNumber(amount || 0);
+
+// undefined if falsey otherwise a valid bignumber
+export const MaybeBigNumber = (amount?: BigNumberish | null): BigNumber | undefined =>
+  amount ? MustBigNumber(amount) : undefined;
+
+export const MaybeNumber = (amount?: BigNumberish | null): number | undefined =>
+  amount ? MustBigNumber(amount).toNumber() : undefined;
+
+export const MustNumber = (amount?: BigNumberish | null): number =>
+  MustBigNumber(amount).toNumber();
+
+// doesnt allow null, always returns big number
+// empty string becomes null though
+export const ToBigNumber = (amount: BigNumberish): BigNumber => {
+  return MustBigNumber(amount);
+};
+
+export const ToNumber = (amount: string): number => {
+  return ToBigNumber(amount).toNumber();
+};
+
+// returns undefined if it's not parseable, otherwise a valid bignumber
+export const AttemptBigNumber = (amount: string | undefined | null): BigNumber | undefined => {
+  if (amount == null) {
+    return undefined;
+  }
+  const bn = new BigNumber(amount);
+  if (!bn.isFinite()) {
+    return undefined;
+  }
+  return bn;
+};
+
+export const AttemptNumber = (amount: string | undefined | null): number | undefined => {
+  return AttemptBigNumber(amount)?.toNumber();
+};
+
+export const clampBn = (n: BigNumber, min: BigNumber, max: BigNumber) =>
+  BigNumber.max(min, BigNumber.min(max, n));
 
 /**
  * @description Rounds the input to the nearest multiple of `factor`, which must be non-zero.
@@ -35,11 +76,19 @@ export const getFractionDigits = (unit?: BigNumberish | null) =>
   // n?.toString().match(/[.](\d*)/)?.[1].length ?? 0
   unit ? Math.max(Math.ceil(-Math.log10(Math.abs(+unit))), 0) : 0;
 
+export const getTickSizeFromPrice = (price: BigNumberish) => {
+  const priceNum = MustBigNumber(price).toNumber();
+  const p = Math.floor(Math.log10(priceNum));
+  const subticksPerTickLog10 = Math.log10(10 ** (9 - 3));
+  const quantumConversionExponent = -9;
+  const exponent = p + quantumConversionExponent + subticksPerTickLog10;
+  return exponent < 0 ? 1 / 10 ** Math.abs(exponent) : 10 ** exponent;
+};
+
 export const getTickSizeDecimalsFromPrice = (price?: BigNumberish | null) => {
   if (!price) return TOKEN_DECIMALS;
-  const priceNum = MustBigNumber(price).toNumber();
-  const p = Math.floor(Math.log(priceNum));
-  return Math.abs(p - 3);
+  const tickSize = getTickSizeFromPrice(price);
+  return getFractionDigits(tickSize);
 };
 
 export const isNumber = (value: any): value is number =>
@@ -65,7 +114,7 @@ export const getSeparator = ({
 }) =>
   Intl.NumberFormat(browserLanguage)
     .formatToParts(1000.1)
-    .find?.((part) => part.type === separatorType)?.value;
+    .find((part) => part.type === separatorType)?.value;
 
 /**
  * Converts a byte array (representing an arbitrary-size signed integer) into a bigint.
@@ -76,7 +125,7 @@ export function bytesToBigInt(u: Uint8Array): bigint {
     return BigInt(0);
   }
   // eslint-disable-next-line no-bitwise
-  const negated: boolean = (u[0] & 1) === 1;
+  const negated: boolean = (u[0]! & 1) === 1;
   const hex: string = Buffer.from(u.slice(1)).toString('hex');
   const abs: bigint = BigInt(`0x${hex}`);
   return negated ? -abs : abs;

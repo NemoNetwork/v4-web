@@ -5,6 +5,10 @@ export const tradeTooltips = {
     title: stringGetter({ key: TOOLTIP_STRING_KEYS.ACCOUNT_LEVERAGE_TITLE }),
     body: stringGetter({ key: TOOLTIP_STRING_KEYS.ACCOUNT_LEVERAGE_BODY }),
   }),
+  'available-balance': ({ stringGetter }) => ({
+    title: stringGetter({ key: TOOLTIP_STRING_KEYS.AVAILABLE_BALANCE_TITLE }),
+    body: stringGetter({ key: TOOLTIP_STRING_KEYS.AVAILABLE_BALANCE_BODY }),
+  }),
   'base-position-notional': ({ stringGetter }) => ({
     title: stringGetter({ key: TOOLTIP_STRING_KEYS.BASE_POSITION_NOTIONAL_TITLE }),
     body: stringGetter({ key: TOOLTIP_STRING_KEYS.BASE_POSITION_NOTIONAL_BODY }),
@@ -90,9 +94,19 @@ export const tradeTooltips = {
     title: stringGetter({ key: TOOLTIP_STRING_KEYS.LIMIT_PRICE_SLIPPAGE_TITLE }),
     body: stringGetter({ key: TOOLTIP_STRING_KEYS.LIMIT_PRICE_SLIPPAGE_BODY }),
   }),
-  'liquidation-price': ({ stringGetter, stringParams }) => ({
-    title: stringGetter({ key: TOOLTIP_STRING_KEYS.LIQUIDATION_PRICE_TITLE }),
-    body: stringGetter({ key: TOOLTIP_STRING_KEYS.LIQUIDATION_PRICE_BODY, params: stringParams }),
+  'liquidation-price-long': ({ stringGetter, stringParams }) => ({
+    title: stringGetter({ key: TOOLTIP_STRING_KEYS.LIQUIDATION_PRICE_LONG_TITLE }),
+    body: stringGetter({
+      key: TOOLTIP_STRING_KEYS.LIQUIDATION_PRICE_LONG_BODY,
+      params: stringParams,
+    }),
+  }),
+  'liquidation-price-short': ({ stringGetter, stringParams }) => ({
+    title: stringGetter({ key: TOOLTIP_STRING_KEYS.LIQUIDATION_PRICE_SHORT_TITLE }),
+    body: stringGetter({
+      key: TOOLTIP_STRING_KEYS.LIQUIDATION_PRICE_SHORT_BODY,
+      params: stringParams,
+    }),
   }),
   'liquidation-price-general': ({ stringGetter }) => ({
     title: stringGetter({ key: TOOLTIP_STRING_KEYS.LIQUIDATION_PRICE_GENERAL_TITLE }),
@@ -130,6 +144,10 @@ export const tradeTooltips = {
     title: stringGetter({ key: TOOLTIP_STRING_KEYS.MARGIN_USAGE_TITLE }),
     body: stringGetter({ key: TOOLTIP_STRING_KEYS.MARGIN_USAGE_BODY }),
   }),
+  'margin-used': ({ stringGetter }) => ({
+    title: stringGetter({ key: TOOLTIP_STRING_KEYS.MARGIN_USED_TITLE }),
+    body: stringGetter({ key: TOOLTIP_STRING_KEYS.MARGIN_USED_BODY }),
+  }),
   'maximum-leverage': ({ stringGetter }) => ({
     title: stringGetter({ key: TOOLTIP_STRING_KEYS.MAXIMUM_LEVERAGE_TITLE }),
     body: stringGetter({ key: TOOLTIP_STRING_KEYS.MAXIMUM_LEVERAGE_BODY }),
@@ -161,6 +179,18 @@ export const tradeTooltips = {
   'partial-close-take-profit': ({ stringGetter }) => ({
     title: stringGetter({ key: TOOLTIP_STRING_KEYS.PARTIAL_CLOSE_TAKE_PROFIT_TITLE }),
     body: stringGetter({ key: TOOLTIP_STRING_KEYS.PARTIAL_CLOSE_TAKE_PROFIT_BODY }),
+  }),
+  'portfolio-value': ({ stringGetter }) => ({
+    title: stringGetter({ key: TOOLTIP_STRING_KEYS.PORTFOLIO_VALUE_TITLE }),
+    body: stringGetter({ key: TOOLTIP_STRING_KEYS.PORTFOLIO_VALUE_BODY }),
+  }),
+  'position-leverage': ({ stringGetter }) => ({
+    title: stringGetter({ key: TOOLTIP_STRING_KEYS.POSITION_LEVERAGE_TITLE }),
+    body: stringGetter({ key: TOOLTIP_STRING_KEYS.POSITION_LEVERAGE_BODY }),
+  }),
+  'position-margin': ({ stringGetter }) => ({
+    title: stringGetter({ key: TOOLTIP_STRING_KEYS.POSITION_MARGIN_TITLE }),
+    body: stringGetter({ key: TOOLTIP_STRING_KEYS.POSITION_MARGIN_BODY }),
   }),
   'post-only': ({ stringGetter }) => ({
     title: stringGetter({ key: TOOLTIP_STRING_KEYS.POST_ONLY_TITLE }),

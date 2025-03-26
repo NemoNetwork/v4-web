@@ -9,13 +9,13 @@ export interface LinksConfigs {
   accountExportLearnMore?: string;
   blogs?: string;
   community?: string;
+  vipsChannel?: string;
   documentation?: string;
   equityTiersLearnMore?: string;
   feedback?: string;
   foundation?: string;
   governanceLearnMore?: string;
   help?: string;
-  vaultLearnMore?: string;
   initialMarginFractionLearnMore?: string;
   isolatedMarginLearnMore?: string;
   keplrDashboard?: string;
@@ -38,13 +38,20 @@ export interface LinksConfigs {
   mintscanValidatorsLearnMore?: string;
   protocolStaking: string;
   stakingAndClaimingRewardsLearnMore?: string;
-  vaultsLearnMore: string;
+  vaultTos?: string;
+  vaultLearnMore?: string;
+  vaultMetrics?: string;
+  vaultOperatorLearnMore?: string;
   predictionMarketLearnMore?: string;
   discoveryProgram?: string;
   getInTouch?: string;
   deployerTermsAndConditions?: string;
   dydxLearnMore?: string;
   affiliateProgram?: string;
+  affiliateProgramFaq?: string;
+  affiliateProgramSupportEmail?: string;
+  launchMarketTos?: string;
+  launchMarketLearnMore?: string;
 }
 
 export const useURLConfigs = (): LinksConfigs => {
@@ -55,6 +62,7 @@ export const useURLConfigs = (): LinksConfigs => {
     accountExportLearnMore: linksConfigs.accountExportLearnMore ?? FALLBACK_URL,
     blogs: linksConfigs.blogs ?? FALLBACK_URL,
     community: linksConfigs.community ?? FALLBACK_URL,
+    vipsChannel: linksConfigs.vipsChannel ?? FALLBACK_URL,
     documentation: linksConfigs.documentation ?? FALLBACK_URL,
     equityTiersLearnMore: linksConfigs.equityTiersLearnMore,
     feedback: linksConfigs.feedback ?? FALLBACK_URL,
@@ -85,13 +93,18 @@ export const useURLConfigs = (): LinksConfigs => {
     protocolStaking: linksConfigs.protocolStaking,
     stakingAndClaimingRewardsLearnMore:
       linksConfigs.stakingAndClaimingRewardsLearnMore ?? FALLBACK_URL,
-    // todo add to the link configs objects
-    vaultsLearnMore: linksConfigs.vaultsLearnMore ?? FALLBACK_URL,
+    vaultTos: linksConfigs.vaultTos ?? FALLBACK_URL,
+    vaultMetrics: linksConfigs.vaultMetrics,
+    vaultOperatorLearnMore: linksConfigs.vaultOperatorLearnMore ?? FALLBACK_URL,
     predictionMarketLearnMore: linksConfigs.predictionMarketLearnMore,
     discoveryProgram: linksConfigs.discoveryProgram,
     getInTouch: linksConfigs.getInTouch,
     deployerTermsAndConditions: linksConfigs.deployerTermsAndConditions,
     dydxLearnMore: linksConfigs.dydxLearnMore ?? FALLBACK_URL,
     affiliateProgram: linksConfigs.affiliateProgram,
+    affiliateProgramFaq: linksConfigs.affiliateProgramFaq,
+    affiliateProgramSupportEmail: linksConfigs.affiliateProgramSupportEmail,
+    launchMarketTos: linksConfigs.launchMarketTos ?? FALLBACK_URL,
+    launchMarketLearnMore: linksConfigs.launchMarketLearnMore ?? FALLBACK_URL,
   };
 };

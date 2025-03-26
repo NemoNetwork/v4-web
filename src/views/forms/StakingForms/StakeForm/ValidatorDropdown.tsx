@@ -90,7 +90,7 @@ const ValidatorsDropdownContent = ({
         commissionRate: MustBigNumber(
           formatUnits(BigInt(val.commission?.commissionRates?.rate ?? 0), commissionRateDecimals)
         ),
-        website: val.description?.website,
+        website: val.description.website,
       });
     }
     return validators;
@@ -113,6 +113,7 @@ const ValidatorsDropdownContent = ({
         key="validators"
         label="Validators"
         data={filteredValidators}
+        tableId="validators"
         getRowKey={(row: ValidatorData) => row.operatorAddress}
         onRowAction={onRowAction}
         columns={columns}
@@ -162,7 +163,7 @@ export const ValidatorDropdown = memo(
     );
 
     const slotTrigger = selectedValidator?.description?.website ? (
-      <Link href={selectedValidator?.description?.website} withIcon>
+      <Link href={selectedValidator.description.website} withIcon>
         {output}
       </Link>
     ) : (

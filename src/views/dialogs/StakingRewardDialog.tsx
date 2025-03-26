@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { BonsaiCore } from '@/bonsai/ontology';
 import { SelectedGasDenom } from '@nemo-network/v4-client-js/src/clients/constants';
-import { shallowEqual } from 'react-redux';
 import styled, { css } from 'styled-components';
 import tw from 'twin.macro';
 import { formatUnits } from 'viem';
@@ -12,6 +12,7 @@ import { DialogProps, StakingRewardDialogProps } from '@/constants/dialogs';
 import { STRING_KEYS } from '@/constants/localization';
 import { NumberSign, SMALL_USD_DECIMALS } from '@/constants/numbers';
 
+import { refreshStakingData } from '@/hooks/useStakingValidator';
 import { useStringGetter } from '@/hooks/useStringGetter';
 import { useSubaccount } from '@/hooks/useSubaccount';
 import { useTokenConfigs } from '@/hooks/useTokenConfigs';
@@ -26,14 +27,14 @@ import {
   type StakeButtonAlert,
 } from '@/views/forms/StakingForms/shared/StakeRewardButtonAndReceipt';
 
-import { getSubaccountEquity } from '@/state/accountSelectors';
 import { useAppSelector } from '@/state/appTypes';
-import { getChartDotBackground } from '@/state/configsSelectors';
+import { getChartDotBackground } from '@/state/appUiConfigsSelectors';
 
 import { track } from '@/lib/analytics/analytics';
 import { BigNumberish, MustBigNumber } from '@/lib/numbers';
 import { log } from '@/lib/telemetry';
 import { hashFromTx } from '@/lib/txUtils';
+import { orEmptyObj } from '@/lib/typeUtils';
 
 export const StakingRewardDialog = ({
   usdcRewards,
@@ -41,13 +42,12 @@ export const StakingRewardDialog = ({
   validators,
 }: DialogProps<StakingRewardDialogProps>) => {
   const stringGetter = useStringGetter();
-  const { usdcLabel, usdcDecimals } = useTokenConfigs();
+  const { usdcImage, usdcLabel, usdcDecimals } = useTokenConfigs();
 
   const { getWithdrawRewardFee, withdrawReward } = useSubaccount();
 
   const chartDotsBackground = useAppSelector(getChartDotBackground);
-  const { current: equity } = useAppSelector(getSubaccountEquity, shallowEqual) ?? {};
-
+  const { equity } = orEmptyObj(useAppSelector(BonsaiCore.account.parentSubaccountSummary.data));
   const [error, setError] = useState<StakeButtonAlert>();
   const [fee, setFee] = useState<BigNumberish>();
   const [isLoading, setIsLoading] = useState(false);
@@ -57,7 +57,7 @@ export const StakingRewardDialog = ({
     getWithdrawRewardFee(validators)
       .then((stdFee) => {
         if (stdFee.amount.length > 0) {
-          const feeAmount = stdFee.amount[0].amount;
+          const feeAmount = stdFee.amount[0]!.amount;
           setFee(MustBigNumber(formatUnits(BigInt(feeAmount), usdcDecimals)));
         } else {
           setFee(undefined);
@@ -121,6 +121,8 @@ export const StakingRewardDialog = ({
       const tx = await withdrawReward(validators);
       const txHash = hashFromTx(tx.hash);
 
+      refreshStakingData();
+
       track(
         AnalyticsEvents.ClaimTransaction({
           txHash,
@@ -159,7 +161,7 @@ export const StakingRewardDialog = ({
             />
             {usdcLabel}
           </$Pill>
-          <AssetIcon symbol="USDC" tw="text-[5rem]" />
+          <AssetIcon logoUrl={usdcImage} symbol="USDC" tw="[--asset-icon-size:5rem]" />
         </div>
         <h3 tw="z-[1] text-color-text-2 font-extra-bold">
           {stringGetter({ key: STRING_KEYS.YOU_EARNED })}

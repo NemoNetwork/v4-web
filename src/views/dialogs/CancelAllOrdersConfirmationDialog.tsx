@@ -18,7 +18,7 @@ import {
   calculateHasCancelableOrdersInOtherMarkets,
 } from '@/state/accountCalculators';
 import { useAppSelector } from '@/state/appTypes';
-import { getCurrentMarketId } from '@/state/perpetualsSelectors';
+import { getCurrentMarketId } from '@/state/currentMarketSelectors';
 
 export const CancelAllOrdersConfirmationDialog = ({
   setIsOpen,
@@ -44,7 +44,7 @@ export const CancelAllOrdersConfirmationDialog = ({
 
   const onSubmit = useCallback(() => {
     cancelAllOrders(shouldCancelAllOrders ? undefined : marketIdOption);
-    setIsOpen?.(false);
+    setIsOpen(false);
   }, [cancelAllOrders, marketIdOption, setIsOpen, shouldCancelAllOrders]);
 
   return (

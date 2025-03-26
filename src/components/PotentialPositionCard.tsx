@@ -1,13 +1,17 @@
 import { useCallback } from 'react';
 
-import { SubaccountPendingPosition } from '@/constants/abacus';
+import { BonsaiCore } from '@/bonsai/ontology';
+import { PendingIsolatedPosition } from '@/bonsai/types/summaryTypes';
+
 import { DialogTypes } from '@/constants/dialogs';
 import { STRING_KEYS } from '@/constants/localization';
 
 import { useStringGetter } from '@/hooks/useStringGetter';
 
-import { useAppDispatch } from '@/state/appTypes';
+import { useAppDispatch, useAppSelector } from '@/state/appTypes';
 import { openDialog } from '@/state/dialogs';
+
+import { orEmptyObj } from '@/lib/typeUtils';
 
 import { Icon, IconName } from './Icon';
 import { Link } from './Link';
@@ -15,13 +19,11 @@ import { Output, OutputType } from './Output';
 import { PortfolioCard } from './PortfolioCard';
 
 type PotentialPositionCardProps = {
-  marketName: string;
   onViewOrders: (marketId: string) => void;
-  pendingPosition: SubaccountPendingPosition;
+  pendingPosition: PendingIsolatedPosition;
 };
 
 export const PotentialPositionCard = ({
-  marketName,
   onViewOrders,
   pendingPosition,
 }: PotentialPositionCardProps) => {
@@ -34,14 +36,17 @@ export const PotentialPositionCard = ({
   );
 
   const stringGetter = useStringGetter();
-  const { assetId, freeCollateral, marketId, orderCount } = pendingPosition;
+  const { displayableAsset, equity, marketId, orders } = pendingPosition;
+  const orderCount = orders.length;
+  const marketSummaries = orEmptyObj(useAppSelector(BonsaiCore.markets.markets.data));
+  const { name, logo } = orEmptyObj(marketSummaries[marketId]);
 
   return (
     <PortfolioCard
-      assetName={marketName}
-      assetId={assetId}
+      assetName={name ?? displayableAsset}
+      assetImgUrl={logo}
       detailLabel={stringGetter({ key: STRING_KEYS.MARGIN })}
-      detailValue={<Output type={OutputType.Fiat} value={freeCollateral?.current} />}
+      detailValue={<Output type={OutputType.Fiat} value={equity} />}
       actionSlot={
         <>
           <Link onClick={() => onViewOrders(marketId)} isAccent tw="font-small-book">

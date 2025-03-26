@@ -1,15 +1,20 @@
 import { useState } from 'react';
 
+import { BonsaiHooks } from '@/bonsai/ontology';
 import { curveMonotoneX, curveStepAfter } from '@visx/curve';
 import type { TooltipContextType } from '@visx/xychart';
-import { shallowEqual } from 'react-redux';
 import styled, { css } from 'styled-components';
 
 import { ButtonSize } from '@/constants/buttons';
-import { FundingRateResolution, type FundingChartDatum } from '@/constants/charts';
+import {
+  FundingDirection,
+  FundingRateResolution,
+  type FundingChartDatum,
+} from '@/constants/charts';
 import { STRING_KEYS } from '@/constants/localization';
-import { FundingDirection } from '@/constants/markets';
-import { SMALL_PERCENT_DECIMALS, TINY_PERCENT_DECIMALS } from '@/constants/numbers';
+import { FUNDING_DECIMALS } from '@/constants/numbers';
+import { EMPTY_ARR } from '@/constants/objects';
+import { timeUnits } from '@/constants/time';
 
 import { useBreakpoints } from '@/hooks/useBreakpoints';
 import { useStringGetter } from '@/hooks/useStringGetter';
@@ -22,14 +27,11 @@ import { ToggleGroup } from '@/components/ToggleGroup';
 import { AxisLabelOutput } from '@/components/visx/AxisLabelOutput';
 import { TimeSeriesChart } from '@/components/visx/TimeSeriesChart';
 
-import { useAppSelector } from '@/state/appTypes';
-import { calculateFundingRateHistory } from '@/state/perpetualsCalculators';
-
 import { MustBigNumber } from '@/lib/numbers';
 
 import { FundingChartTooltipContent } from './Tooltip';
 
-const FUNDING_RATE_TIME_RESOLUTION = 60 * 60 * 1000; // 1 hour
+const FUNDING_RATE_TIME_RESOLUTION = timeUnits.hour;
 
 const getAllFundingRates = (oneHourRate: number = 0) => ({
   [FundingRateResolution.OneHour]: oneHourRate,
@@ -49,7 +51,9 @@ export const FundingChart = ({ selectedLocale }: ElementProps) => {
   const stringGetter = useStringGetter();
 
   // Chart data
-  const data = useAppSelector(calculateFundingRateHistory, shallowEqual);
+  const { data, status } = BonsaiHooks.useCurrentMarketHistoricalFunding();
+  const isLoading = status === 'pending';
+  const isError = status === 'error';
 
   const latestDatum = data?.[data.length - 1];
 
@@ -65,7 +69,7 @@ export const FundingChart = ({ selectedLocale }: ElementProps) => {
   return (
     <TimeSeriesChart
       selectedLocale={selectedLocale}
-      data={data}
+      data={data ?? EMPTY_ARR}
       yAxisScaleType="symlog"
       margin={{
         left: isMobile ? 0 : 88,
@@ -82,14 +86,14 @@ export const FundingChart = ({ selectedLocale }: ElementProps) => {
       series={[
         {
           dataKey: 'funding-rate',
-          xAccessor: (datum) => datum?.time,
-          yAccessor: (datum) => datum?.fundingRate,
+          xAccessor: (datum) => datum?.time ?? 0,
+          yAccessor: (datum) => datum?.fundingRate ?? 0,
           colorAccessor: () => 'var(--color-text-1)',
           getCurve: ({ zoom }) => (zoom > 12 ? curveMonotoneX : curveStepAfter),
         },
       ]}
       tickFormatY={(value) =>
-        `${(getAllFundingRates(value)[fundingRateView] * 100).toFixed(SMALL_PERCENT_DECIMALS)}%`
+        `${(getAllFundingRates(value)[fundingRateView] * 100).toFixed(fundingRateView === FundingRateResolution.Annualized ? 0 : FUNDING_DECIMALS)}%`
       }
       renderXAxisLabel={({ tooltipData }) => {
         const tooltipDatum = tooltipData!.nearestDatum?.datum ?? latestDatum;
@@ -97,7 +101,7 @@ export const FundingChart = ({ selectedLocale }: ElementProps) => {
         return (
           <AxisLabelOutput
             type={OutputType.DateTime}
-            value={tooltipDatum.time}
+            value={tooltipDatum?.time}
             tw="shadow-[0_0_0.5rem_var(--color-layer-2)]"
           />
         );
@@ -108,13 +112,14 @@ export const FundingChart = ({ selectedLocale }: ElementProps) => {
         return (
           <$YAxisLabelOutput
             type={OutputType.SmallPercent}
-            value={getAllFundingRates(tooltipDatum.fundingRate)[fundingRateView]}
+            fractionDigits={FUNDING_DECIMALS}
+            value={getAllFundingRates(tooltipDatum?.fundingRate)[fundingRateView]}
             accentColor={
               {
                 [FundingDirection.ToLong]: 'var(--color-negative)',
                 [FundingDirection.ToShort]: 'var(--color-positive)',
                 [FundingDirection.None]: 'var(--color-layer-6)',
-              }[tooltipDatum.direction]
+              }[tooltipDatum?.direction ?? FundingDirection.None]
             }
           />
         );
@@ -128,8 +133,19 @@ export const FundingChart = ({ selectedLocale }: ElementProps) => {
       )}
       onTooltipContext={(ttContext) => setTooltipContext(ttContext)}
       minZoomDomain={FUNDING_RATE_TIME_RESOLUTION * 4}
+      defaultZoomDomain={timeUnits.day * 14}
       numGridLines={1}
-      slotEmpty={<LoadingSpace id="funding-chart-loading" />}
+      slotEmpty={
+        isLoading ? (
+          <LoadingSpace id="funding-chart-loading" />
+        ) : (
+          isError && (
+            <div tw="flex flex-col justify-center text-center align-middle">
+              {stringGetter({ key: STRING_KEYS.SOMETHING_WENT_WRONG })}
+            </div>
+          )
+        )
+      }
     >
       <div tw="isolate m-1 [place-self:start_end]">
         <ToggleGroup
@@ -173,8 +189,8 @@ export const FundingChart = ({ selectedLocale }: ElementProps) => {
         <$Output
           type={OutputType.SmallPercent}
           value={latestFundingRate}
-          fractionDigits={TINY_PERCENT_DECIMALS}
-          isNegative={latestFundingRate < 0}
+          fractionDigits={FUNDING_DECIMALS}
+          isNegative={(latestFundingRate ?? 0) < 0}
         />
       </$CurrentFundingRate>
     </TimeSeriesChart>
