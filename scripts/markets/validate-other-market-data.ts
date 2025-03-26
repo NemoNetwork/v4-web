@@ -13,10 +13,8 @@ import {
   LocalWallet as LocalWalletType,
   Network,
   ProposalStatus,
-} from '@dydxprotocol/v4-client-js';
-import { ClobPair } from '@dydxprotocol/v4-proto/src/codegen/dydxprotocol/clob/clob_pair';
-import { Perpetual } from '@dydxprotocol/v4-proto/src/codegen/dydxprotocol/perpetuals/perpetual';
-import { MarketPrice } from '@dydxprotocol/v4-proto/src/codegen/dydxprotocol/prices/market_price';
+} from '@nemo-network/v4-client-js/src';
+import { ClobPair } from '@nemo-network/v4-proto/src/codegen/nemo_network/clob/clob_pair';
 import Ajv from 'ajv';
 import axios from 'axios';
 import { readFileSync } from 'fs';
@@ -35,7 +33,7 @@ import {
 } from './help';
 
 const LocalWalletModule = await import(
-  '@dydxprotocol/v4-client-js/src/clients/modules/local-wallet'
+  '@nemo-network/v4-client-js/src/clients/modules/local-wallet'
 );
 const LocalWallet = LocalWalletModule.default;
 

@@ -7,8 +7,8 @@ import {
   LocalWallet as LocalWalletType,
   TransactionOptions,
   VoteOption,
-} from '@dydxprotocol/v4-client-js';
-import { MsgVote } from '@dydxprotocol/v4-proto/src/codegen/cosmos/gov/v1/tx';
+} from '@nemo-network/v4-client-js/src';
+import { MsgVote } from '@nemo-network/v4-proto/src/codegen/cosmos/gov/v1/tx';
 import { spawn } from 'child_process';
 import * as fs from 'fs';
 import Long from 'long';

@@ -1,4 +1,4 @@
-import { SubaccountClient } from '@dydxprotocol/v4-client-js';
+import { SubaccountClient } from '@nemo-network/v4-client-js/src';
 import BigNumber from 'bignumber.js';
 
 import { AMOUNT_RESERVED_FOR_GAS_USDC, AMOUNT_USDC_BEFORE_REBALANCE } from '@/constants/account';

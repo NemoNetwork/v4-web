@@ -1,4 +1,4 @@
-import { HeightResponse } from '@dydxprotocol/v4-client-js';
+import { HeightResponse } from '@nemo-network/v4-client-js/src/clients/types';
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 import { DydxNetwork } from '@/constants/networks';

@@ -1,5 +1,3 @@
-import { VaultModule } from '@dydxprotocol/v4-client-js';
-
 import { STRING_KEYS } from '@/constants/localization';
 
 import { ToPrimitives } from '@/lib/abacus/parseToPrimitives';

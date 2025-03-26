@@ -2,11 +2,11 @@ import { useCallback, useMemo } from 'react';
 
 import { BonsaiCore } from '@/bonsai/ontology';
 import { FeeTierSummary } from '@/bonsai/types/summaryTypes';
-import { Nullable } from '@dydxprotocol/v4-abacus';
 import { DoubleArrowUpIcon } from '@radix-ui/react-icons';
 import styled from 'styled-components';
 import tw from 'twin.macro';
 
+import { Nullable } from '@/constants/abacus';
 import { STRING_KEYS } from '@/constants/localization';
 import { FEE_DECIMALS } from '@/constants/numbers';
 

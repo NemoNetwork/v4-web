@@ -1,9 +1,8 @@
-import { type onboarding } from '@dydxprotocol/v4-client-js';
+import { onboarding } from '@nemo-network/v4-client-js/src';
 import { WalletType as CosmosWalletType } from 'graz';
 import { EIP6963ProviderInfo } from 'mipd';
 
-import { STRING_KEYS } from '@/constants/localization';
-
+// import { STRING_KEYS } from '@/constants/localization';
 import {
   CoinbaseIcon,
   EmailIcon,
@@ -15,6 +14,8 @@ import {
   WalletConnectIcon,
 } from '@/icons';
 
+// eslint-disable-next-line import/no-cycle
+import { STRING_KEYS } from './localization';
 import { DydxChainId, WALLETS_CONFIG_MAP } from './networks';
 
 export enum WalletErrorType {

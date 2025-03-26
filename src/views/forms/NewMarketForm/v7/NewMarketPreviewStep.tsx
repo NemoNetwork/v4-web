@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 
 import { BonsaiHelpers } from '@/bonsai/ontology';
 import { IndexedTx } from '@cosmjs/stargate';
-import { encodeJson } from '@dydxprotocol/v4-client-js';
+import { encodeJson } from '@nemo-network/v4-client-js/src';
 import styled from 'styled-components';
 import tw from 'twin.macro';
 

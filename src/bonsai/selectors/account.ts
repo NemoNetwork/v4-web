@@ -1,4 +1,4 @@
-import { NOBLE_BECH32_PREFIX } from '@dydxprotocol/v4-client-js';
+import { NOBLE_BECH32_PREFIX } from '@nemo-network/v4-client-js/src';
 import { orderBy, pick } from 'lodash';
 import { shallowEqual } from 'react-redux';
 

@@ -11,7 +11,7 @@ import {
   TYPE_URL_MSG_CREATE_PERPETUAL,
   TYPE_URL_MSG_DELAY_MESSAGE,
   TYPE_URL_MSG_UPDATE_CLOB_PAIR,
-} from '@dydxprotocol/v4-client-js';
+} from '@nemo-network/v4-client-js/src';
 import { useQuery } from '@tanstack/react-query';
 
 import type { PerpetualMarketResponse } from '@/constants/indexer';

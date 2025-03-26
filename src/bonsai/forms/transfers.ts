@@ -1,4 +1,4 @@
-import { validation } from '@dydxprotocol/v4-client-js';
+import { validation } from '@nemo-network/v4-client-js/src';
 
 import { STRING_KEYS } from '@/constants/localization';
 import { TOKEN_DECIMALS, USD_DECIMALS } from '@/constants/numbers';

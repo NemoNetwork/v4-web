@@ -14,8 +14,7 @@ import { BonsaiCore } from '@/bonsai/ontology';
 import type { EncodeObject } from '@cosmjs/proto-signing';
 import { IndexedTx } from '@cosmjs/stargate';
 import { Method } from '@cosmjs/tendermint-rpc';
-import { type Nullable } from '@dydxprotocol/v4-abacus';
-import { SubaccountClient, type LocalWallet } from '@dydxprotocol/v4-client-js';
+import { SubaccountClient } from '@nemo-network/v4-client-js/src';
 import { useMutation } from '@tanstack/react-query';
 import Long from 'long';
 import { formatUnits, parseUnits } from 'viem';
@@ -24,6 +23,7 @@ import type {
   HumanReadableCancelOrderPayload,
   HumanReadablePlaceOrderPayload,
   HumanReadableSubaccountTransferPayload,
+  Nullable,
   ParsingError,
 } from '@/constants/abacus';
 import { AMOUNT_RESERVED_FOR_GAS_USDC, AMOUNT_USDC_BEFORE_REBALANCE } from '@/constants/account';

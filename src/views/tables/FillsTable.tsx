@@ -2,11 +2,11 @@ import { forwardRef, Key, useMemo } from 'react';
 
 import { BonsaiCore, BonsaiHelpers } from '@/bonsai/ontology';
 import { PerpetualMarketSummary, SubaccountFill } from '@/bonsai/types/summaryTypes';
-import { Nullable } from '@dydxprotocol/v4-abacus';
 import type { ColumnSize } from '@react-types/table';
 import styled, { css } from 'styled-components';
 import tw from 'twin.macro';
 
+import { Nullable } from '@/constants/abacus';
 import { DialogTypes } from '@/constants/dialogs';
 import { STRING_KEYS, type StringGetterFunction } from '@/constants/localization';
 import { IndexerOrderSide } from '@/types/indexer/indexerApiGen';

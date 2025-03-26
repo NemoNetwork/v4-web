@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 
 import { BonsaiHelpers } from '@/bonsai/ontology';
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide } from '@nemo-network/v4-client-js/src/clients/constants';
 import type { RenderTooltipParams } from '@visx/xychart/lib/components/Tooltip';
 
 import type { Nullable } from '@/constants/abacus';

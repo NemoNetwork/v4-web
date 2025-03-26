@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide } from '@nemo-network/v4-client-js/src/clients/constants';
 import { debounce } from 'lodash';
 import styled, { css } from 'styled-components';
 

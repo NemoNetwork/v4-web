@@ -1,5 +1,5 @@
 import { BonsaiHelpers } from '@/bonsai/ontology';
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide } from '@nemo-network/v4-client-js/src/clients/constants';
 import { shallowEqual } from 'react-redux';
 import styled from 'styled-components';
 

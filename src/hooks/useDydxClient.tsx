@@ -13,7 +13,7 @@ import {
   ValidatorConfig,
   onboarding,
   type ProposalStatus,
-} from '@dydxprotocol/v4-client-js';
+} from '@nemo-network/v4-client-js/src';
 import type { ResolutionString } from 'public/tradingview/charting_library';
 
 import type { ConnectNetworkEvent, NetworkConfig } from '@/constants/abacus';
