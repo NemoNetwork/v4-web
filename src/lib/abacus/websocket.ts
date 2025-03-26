@@ -31,6 +31,7 @@ class AbacusWebsocket implements Omit<AbacusWebsocketProtocol, '__doNotUseOrImpl
   orderbookCandlesToggleOn: boolean = true;
 
   connect(url: string, connected: (p0: boolean) => void, received: (p0: string) => void): void {
+    console.log('connect', url);
     this.url = url;
     this.connectedCallback = connected;
     this.receivedCallback = received;

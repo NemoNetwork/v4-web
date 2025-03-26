@@ -354,7 +354,7 @@ export type AnalyticsEvent = UnionOf<typeof AnalyticsEvents>;
 export type AnalyticsEventTypes = TagsOf<typeof AnalyticsEvents>;
 export type AnalyticsEventPayloads = RecordOf<typeof AnalyticsEvents>;
 
-export const DEFAULT_TRANSACTION_MEMO = 'dYdX Frontend (web)';
+export const DEFAULT_TRANSACTION_MEMO = 'Nemo Frontend (web)';
 export enum TransactionMemo {
   depositToSubaccount = `${DEFAULT_TRANSACTION_MEMO} | deposit from wallet to subaccount`,
   withdrawFromSubaccount = `${DEFAULT_TRANSACTION_MEMO} | withdraw from subaccount to wallet`,
