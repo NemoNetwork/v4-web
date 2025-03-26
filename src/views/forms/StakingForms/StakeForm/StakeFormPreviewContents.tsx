@@ -30,7 +30,7 @@ export const StakeFormPreviewContents = ({
   setCurrentStep,
 }: ElementProps) => {
   const stringGetter = useStringGetter();
-  const { chainTokenLabel } = useTokenConfigs();
+  const { chainTokenImage, chainTokenLabel } = useTokenConfigs();
 
   const { website, moniker } = selectedValidator?.description ?? {};
 
@@ -43,8 +43,9 @@ export const StakeFormPreviewContents = ({
       slotLeft={
         <>
           <AssetIcon
+            logoUrl={chainTokenImage}
             symbol={chainTokenLabel}
-            tw="text-[length:--icon-size] [--icon-size:2.25rem]"
+            tw="[--asset-icon-size:--icon-size] [--icon-size:2.25rem]"
           />
           <Output value={stakedAmount} type={OutputType.Asset} tag={chainTokenLabel} />
         </>

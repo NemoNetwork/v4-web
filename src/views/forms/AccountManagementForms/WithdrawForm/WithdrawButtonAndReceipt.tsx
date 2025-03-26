@@ -23,11 +23,12 @@ import { WithTooltip } from '@/components/WithTooltip';
 import { OnboardingTriggerButton } from '@/views/dialogs/OnboardingTriggerButton';
 
 import { calculateCanAccountTrade } from '@/state/accountCalculators';
-import { getSubaccount } from '@/state/accountSelectors';
+import { getSubaccount, getSubaccountForPostOrder } from '@/state/accountSelectors';
 import { useAppSelector } from '@/state/appTypes';
 import { getTransferInputs } from '@/state/inputsSelectors';
 
 import { isTruthy } from '@/lib/isTruthy';
+import { orEmptyObj } from '@/lib/typeUtils';
 
 import { RouteWarningMessage } from '../RouteWarningMessage';
 import { SlippageEditor } from '../SlippageEditor';
@@ -55,6 +56,8 @@ export const WithdrawButtonAndReceipt = ({
   const stringGetter = useStringGetter();
 
   const { leverage } = useAppSelector(getSubaccount, shallowEqual) ?? {};
+  const { leverage: leveragePost } = orEmptyObj(useAppSelector(getSubaccountForPostOrder));
+  const leveragePostOrder = leveragePost?.postOrder;
   const {
     summary,
     requestPayload,
@@ -75,7 +78,7 @@ export const WithdrawButtonAndReceipt = ({
       label: (
         <$RowWithGap>
           {stringGetter({ key: STRING_KEYS.EXPECTED_AMOUNT_RECEIVED })}
-          {withdrawToken && <Tag>{withdrawToken?.symbol}</Tag>}
+          {withdrawToken && <Tag>{withdrawToken.symbol}</Tag>}
         </$RowWithGap>
       ),
       value: (
@@ -102,7 +105,7 @@ export const WithdrawButtonAndReceipt = ({
       label: (
         <WithTooltip tooltip="gas-fees">{stringGetter({ key: STRING_KEYS.GAS_FEE })}</WithTooltip>
       ),
-      value: <Output type={OutputType.Fiat} value={summary?.gasFee} />,
+      value: <Output type={OutputType.Fiat} value={summary.gasFee} />,
     },
     typeof summary?.bridgeFee === 'number' && {
       key: 'bridge-fees',
@@ -111,7 +114,7 @@ export const WithdrawButtonAndReceipt = ({
           {stringGetter({ key: STRING_KEYS.BRIDGE_FEE })}
         </WithTooltip>
       ),
-      value: <Output type={OutputType.Fiat} value={summary?.bridgeFee} />,
+      value: <Output type={OutputType.Fiat} value={summary.bridgeFee} />,
     },
     !exchange && {
       key: 'slippage',
@@ -150,11 +153,11 @@ export const WithdrawButtonAndReceipt = ({
       value: (
         <DiffOutput
           type={OutputType.Multiple}
-          value={leverage?.current}
-          newValue={leverage?.postOrder}
+          value={leverage}
+          newValue={leveragePostOrder}
           sign={NumberSign.Negative}
           withDiff={Boolean(
-            leverage?.current && leverage?.postOrder && leverage.current !== leverage?.postOrder
+            leverage && leveragePostOrder && leverage.toNumber() !== leveragePostOrder
           )}
           tw="[--diffOutput-valueWithDiff-fontSize:1em]"
         />

@@ -1,7 +1,13 @@
-import { isDev } from '@/constants/networks';
-
 class TestFlags {
   public queryParams: { [key: string]: string };
+
+  private isValueExplicitlyFalse = (value: string) =>
+    ['false', '0', 'no', 'off'].includes(value.toLowerCase());
+
+  private booleanFlag = (value?: string, defaultTrue?: boolean) => {
+    if (!value) return defaultTrue ?? false;
+    return !this.isValueExplicitlyFalse(value);
+  };
 
   constructor() {
     this.queryParams = {};
@@ -27,43 +33,39 @@ class TestFlags {
   }
 
   get displayInitializingMarkets() {
-    return !!this.queryParams.displayinitializingmarkets;
+    return this.booleanFlag(this.queryParams.displayinitializingmarkets);
   }
 
-  get addressOverride(): string {
+  get addressOverride(): string | undefined {
     return this.queryParams.address;
-  }
-
-  get enableVaults() {
-    return !!this.queryParams.vaults || isDev;
   }
 
   get referrer() {
     return this.queryParams.utm_source;
   }
 
-  get enablePredictionMarketPerp() {
-    return !!this.queryParams.prediction || isDev;
-  }
-
-  get pml() {
-    return !!this.queryParams.pml;
-  }
-
   get showLimitClose() {
-    return !!this.queryParams.limitclose;
+    return this.booleanFlag(this.queryParams.limitclose);
   }
 
   get referralCode() {
     return this.queryParams.ref;
   }
 
-  get enableStaticTyping() {
-    return !!this.queryParams.statictyping;
+  get showInstantDepositToggle() {
+    return !!this.queryParams.funkit_toggle;
   }
 
-  get uiRefresh() {
-    return !!this.queryParams.uirefresh || isDev;
+  get disableAbacus() {
+    return this.booleanFlag(this.queryParams.disable_abacus);
+  }
+
+  get showNewDepositFlow() {
+    return !!this.queryParams.deposit_rewrite;
+  }
+
+  get showNewWithdrawFlow() {
+    return !!this.queryParams.withdraw_rewrite;
   }
 }
 

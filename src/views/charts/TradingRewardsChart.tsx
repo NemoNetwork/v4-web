@@ -1,15 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { curveLinear } from '@visx/curve';
+import { BonsaiHooks } from '@/bonsai/ontology';
+import { curveStepAfter } from '@visx/curve';
 import { TooltipContextType } from '@visx/xychart';
 import { debounce } from 'lodash';
 import styled from 'styled-components';
 
-import {
-  HistoricalTradingReward,
-  HistoricalTradingRewardsPeriod,
-  Nullable,
-} from '@/constants/abacus';
 import {
   TradingRewardsPeriod,
   tradingRewardsPeriods,
@@ -18,27 +14,24 @@ import {
 import { NORMAL_DEBOUNCE_MS } from '@/constants/debounce';
 import { STRING_KEYS } from '@/constants/localization';
 import { TOKEN_DECIMALS } from '@/constants/numbers';
+import { EMPTY_ARR } from '@/constants/objects';
 import { timeUnits } from '@/constants/time';
 
 import { useEnvConfig } from '@/hooks/useEnvConfig';
 import { useLocaleSeparators } from '@/hooks/useLocaleSeparators';
 import { useNow } from '@/hooks/useNow';
-import { useParameterizedSelector } from '@/hooks/useParameterizedSelector';
 import { useStringGetter } from '@/hooks/useStringGetter';
 import { useTokenConfigs } from '@/hooks/useTokenConfigs';
 
 import { layoutMixins } from '@/styles/layoutMixins';
 
 import { AssetIcon } from '@/components/AssetIcon';
+import { LoadingSpace } from '@/components/Loading/LoadingSpinner';
 import { OutputType, formatNumberOutput } from '@/components/Output';
 import { ToggleGroup } from '@/components/ToggleGroup';
 import { TimeSeriesChart } from '@/components/visx/TimeSeriesChart';
 
 import { calculateCanViewAccount } from '@/state/accountCalculators';
-import {
-  getHistoricalTradingRewardsForPeriod,
-  getTotalTradingRewards,
-} from '@/state/accountSelectors';
 import { useAppSelector } from '@/state/appTypes';
 
 import { formatRelativeTime } from '@/lib/dateTime';
@@ -54,7 +47,6 @@ type StyleProps = {
 };
 
 const TRADING_REWARDS_TIME_RESOLUTION = 1 * timeUnits.hour;
-const SELECTED_PERIOD = HistoricalTradingRewardsPeriod.DAILY;
 
 const CHART_STYLES = {
   margin: { left: 32, right: 48, top: 12, bottom: 32 },
@@ -72,7 +64,7 @@ export const TradingRewardsChart = ({
   className,
 }: ElementProps & StyleProps) => {
   const stringGetter = useStringGetter();
-  const { chainTokenLabel } = useTokenConfigs();
+  const { chainTokenImage, chainTokenLabel } = useTokenConfigs();
 
   const rewardsHistoryStartDate = useEnvConfig('rewardsHistoryStartDateMs');
   const now = useNow({ intervalMs: timeUnits.minute });
@@ -88,28 +80,20 @@ export const TradingRewardsChart = ({
   const [defaultZoomDomain, setDefaultZoomDomain] = useState<number | undefined>(undefined);
 
   const canViewAccount = useAppSelector(calculateCanViewAccount);
-  const totalTradingRewards = useAppSelector(getTotalTradingRewards);
-  const periodTradingRewards: Nullable<Array<HistoricalTradingReward>> = useParameterizedSelector(
-    getHistoricalTradingRewardsForPeriod,
-    SELECTED_PERIOD.name
-  );
+  const totalTradingRewards = BonsaiHooks.useTotalTradingRewards().data;
+  const { data: periodTradingRewards = EMPTY_ARR, status } =
+    BonsaiHooks.useDailyCumulativeTradingRewards();
+  const isLoading = status === 'pending';
 
   const rewardsData = useMemo(() => {
-    if (periodTradingRewards && canViewAccount) {
-      const res = periodTradingRewards.map(
-        (datum): TradingRewardsDatum => ({
-          date: new Date(datum.endedAtInMilliseconds).valueOf(),
-          cumulativeAmount: datum.cumulativeAmount,
-        })
-      );
-      res.sort((datumA, datumB) => datumA.date - datumB.date);
-      return res;
+    if (canViewAccount) {
+      return periodTradingRewards;
     }
-    return [];
+    return EMPTY_ARR;
   }, [periodTradingRewards, canViewAccount]);
 
-  const oldestDataPointDate = rewardsData?.[0]?.date;
-  const newestDataPointDate = rewardsData?.[rewardsData.length - 1]?.date;
+  const oldestDataPointDate = rewardsData[0]?.date;
+  const newestDataPointDate = rewardsData[rewardsData.length - 1]?.date;
 
   const msForPeriod = useCallback(
     (period: TradingRewardsPeriod, clampMax: Boolean = true) => {
@@ -138,12 +122,9 @@ export const TradingRewardsChart = ({
   // e.g. oldest date is 31 days old -> show 30d option, but not 90d
   const getPeriodOptions = useCallback(
     (oldestMs: number): TradingRewardsPeriod[] =>
-      tradingRewardsPeriods.reduce((acc: TradingRewardsPeriod[], period) => {
-        if (oldestMs <= (newestDataPointDate ?? now) - msForPeriod(period, false)) {
-          acc.push(period);
-        }
-        return acc;
-      }, []),
+      tradingRewardsPeriods.filter((period) => {
+        return oldestMs <= (newestDataPointDate ?? now) - msForPeriod(period, false);
+      }),
     [msForPeriod, newestDataPointDate, now]
   );
 
@@ -169,25 +150,37 @@ export const TradingRewardsChart = ({
           } else {
             // Update period to new selected period
             setIsZooming(false);
-            setSelectedPeriod(periodOptions[predefinedPeriodIx]);
+            setSelectedPeriod(periodOptions[predefinedPeriodIx]!);
           }
         }
       }, NORMAL_DEBOUNCE_MS),
     [periodOptions, msForPeriod]
   );
 
+  const hasSetDomainWithData = useRef(false);
   useEffect(() => {
+    if (rewardsData.length > 0 && !hasSetDomainWithData.current) {
+      hasSetDomainWithData.current = true;
+      setDefaultZoomDomain(msForPeriod(selectedPeriod));
+      return;
+    }
     if (isZooming) {
       setDefaultZoomDomain(undefined);
     } else {
       setDefaultZoomDomain(msForPeriod(selectedPeriod));
     }
-  }, [isZooming, msForPeriod, selectedPeriod]);
+  }, [isZooming, msForPeriod, selectedPeriod, rewardsData]);
 
   const onToggleInteract = () => setIsZooming(false);
 
-  const xAccessorFunc = useCallback((datum: TradingRewardsDatum) => datum?.date, []);
-  const yAccessorFunc = useCallback((datum: TradingRewardsDatum) => datum?.cumulativeAmount, []);
+  const xAccessorFunc = useCallback(
+    (datum: TradingRewardsDatum | undefined) => datum?.date ?? 0,
+    []
+  );
+  const yAccessorFunc = useCallback(
+    (datum: TradingRewardsDatum | undefined) => datum?.cumulativeAmount ?? 0,
+    []
+  );
 
   const series = useMemo(
     () => [
@@ -196,7 +189,7 @@ export const TradingRewardsChart = ({
         xAccessor: xAccessorFunc,
         yAccessor: yAccessorFunc,
         colorAccessor: () => 'var(--trading-rewards-line-color)',
-        getCurve: () => curveLinear,
+        getCurve: () => curveStepAfter,
       },
     ],
     [xAccessorFunc, yAccessorFunc]
@@ -263,7 +256,7 @@ export const TradingRewardsChart = ({
         renderTooltip={renderTooltip}
         onTooltipContext={setTooltipContext}
         onZoom={onZoomSnap}
-        slotEmpty={slotEmpty}
+        slotEmpty={isLoading ? <LoadingSpace id="trading-rewards-chart" /> : slotEmpty}
         defaultZoomDomain={defaultZoomDomain}
         minZoomDomain={TRADING_REWARDS_TIME_RESOLUTION * 2}
         numGridLines={0}
@@ -273,10 +266,10 @@ export const TradingRewardsChart = ({
         {rewardsData.length > 0 && (
           <$Value>
             {MustBigNumber(
-              tooltipContext?.tooltipData?.nearestDatum?.datum?.cumulativeAmount ??
+              tooltipContext?.tooltipData?.nearestDatum?.datum.cumulativeAmount ??
                 totalTradingRewards
             ).toFixed(TOKEN_DECIMALS)}
-            <AssetIcon symbol={chainTokenLabel} />
+            <AssetIcon logoUrl={chainTokenImage} symbol={chainTokenLabel} />
           </$Value>
         )}
       </TimeSeriesChart>

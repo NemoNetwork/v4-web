@@ -24,13 +24,15 @@ type ElementProps = {
   notifications: {
     notification: Notification<any, any>;
     key: string;
-    displayData: NotificationDisplayData;
+    displayData: NotificationDisplayData | undefined;
   }[];
 };
 
 type StyleProps = {
   className?: string;
 };
+
+const NOTIFICATIONS_INIT_TIME = Date.now();
 
 export const NotificationStack = ({ notifications, className }: ElementProps & StyleProps) => {
   const [shouldStackNotifications, setshouldStackNotifications] = useState(true);
@@ -60,29 +62,34 @@ export const NotificationStack = ({ notifications, className }: ElementProps & S
         <StyledToast
           key={key}
           isStacked={idx > 0 && shouldStackNotifications}
-          isOpen={notification.status < NotificationStatus.Unseen}
+          isOpen={
+            notification.status < NotificationStatus.Unseen &&
+            (notification.timestamps[NotificationStatus.Updated] ??
+              notification.timestamps[NotificationStatus.Triggered] ??
+              0) > NOTIFICATIONS_INIT_TIME
+          }
           layer={idx}
           notification={notification}
-          slotIcon={displayData.icon}
-          slotTitle={displayData.title}
-          slotTitleLeft={displayData.slotTitleLeft}
-          slotTitleRight={displayData.slotTitleRight}
-          slotDescription={displayData.body}
-          slotCustomContent={displayData.renderCustomBody?.({ isToast: true, notification })}
+          slotIcon={displayData?.icon}
+          slotTitle={displayData?.title}
+          slotTitleLeft={displayData?.slotTitleLeft}
+          slotTitleRight={displayData?.slotTitleRight}
+          slotDescription={displayData?.body}
+          slotCustomContent={displayData?.renderCustomBody?.({ isToast: true, notification })}
           onClick={() => onNotificationAction(notification)}
           slotAction={
-            displayData.renderActionSlot ? (
+            displayData?.renderActionSlot ? (
               displayData.renderActionSlot({ isToast: true, notification })
-            ) : displayData.actionDescription ? (
+            ) : displayData?.actionDescription ? (
               <Button size={ButtonSize.Small} onClick={() => onNotificationAction(notification)}>
                 {displayData.actionDescription}
               </Button>
             ) : undefined
           }
-          actionDescription={displayData.actionDescription}
-          actionAltText={displayData.actionAltText}
-          duration={displayData.toastDuration ?? Infinity}
-          sensitivity={displayData.toastSensitivity}
+          actionDescription={displayData?.actionDescription}
+          actionAltText={displayData?.actionAltText}
+          duration={displayData?.toastDuration ?? Infinity}
+          sensitivity={displayData?.toastSensitivity}
           setIsOpen={(isOpen: boolean, isClosedFromTimeout?: boolean) => {
             if (!isOpen)
               if (isClosedFromTimeout)

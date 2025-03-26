@@ -2,17 +2,12 @@ import { forwardRef } from 'react';
 
 import styled, { css } from 'styled-components';
 
-import type { Nullable } from '@/constants/abacus';
 import { STRING_KEYS } from '@/constants/localization';
-import { TOKEN_DECIMALS } from '@/constants/numbers';
 import { ORDERBOOK_ROW_HEIGHT } from '@/constants/orderbook';
 
 import { useStringGetter } from '@/hooks/useStringGetter';
 
 import { Output, OutputType } from '@/components/Output';
-
-import { useAppSelector } from '@/state/appTypes';
-import { getCurrentMarketMidMarketPriceWithOraclePriceFallback } from '@/state/perpetualsSelectors';
 
 type StyleProps = {
   side?: 'top' | 'bottom';
@@ -20,7 +15,8 @@ type StyleProps = {
 };
 
 type ElementProps = {
-  tickSizeDecimals?: Nullable<number>;
+  midMarketPrice?: number;
+  tickSizeDecimals?: number;
 };
 
 export const OrderbookRow = styled.div<{ isHeader?: boolean }>`
@@ -51,19 +47,17 @@ export const OrderbookRow = styled.div<{ isHeader?: boolean }>`
 `;
 
 export const OrderbookMiddleRow = forwardRef<HTMLDivElement, StyleProps & ElementProps>(
-  ({ side, isHeader, tickSizeDecimals = TOKEN_DECIMALS }, ref) => {
+  ({ side, isHeader, midMarketPrice, tickSizeDecimals }, ref) => {
     const stringGetter = useStringGetter();
-    const orderbookMidMarketPrice = useAppSelector(
-      getCurrentMarketMidMarketPriceWithOraclePriceFallback
-    );
 
     return (
       <$OrderbookMiddleRow ref={ref} side={side} isHeader={isHeader}>
         <span>{stringGetter({ key: STRING_KEYS.PRICE })}</span>
         <span tw="flex flex-col">
           <Output
+            withSubscript
             type={OutputType.Number}
-            value={orderbookMidMarketPrice}
+            value={midMarketPrice}
             fractionDigits={tickSizeDecimals}
             tw="[justify-content:right]"
           />
@@ -77,6 +71,7 @@ const $OrderbookMiddleRow = styled(OrderbookRow)<{ side?: 'top' | 'bottom' }>`
   height: 1.75rem;
   border-top: var(--border);
   border-bottom: var(--border);
+  white-space: nowrap;
 
   ${({ side }) =>
     side &&

@@ -1,12 +1,12 @@
 import { useEffect, useMemo } from 'react';
 
+import { BonsaiHelpers } from '@/bonsai/ontology';
 import { shallowEqual } from 'react-redux';
 import { useMatch, useNavigate } from 'react-router-dom';
 
-import { SubaccountPosition } from '@/constants/abacus';
 import { DialogTypes, TradeBoxDialogTypes } from '@/constants/dialogs';
 import { LocalStorageKey } from '@/constants/localStorage';
-import { DEFAULT_MARKETID, PREDICTION_MARKET } from '@/constants/markets';
+import { DEFAULT_MARKETID, MarketFilters } from '@/constants/markets';
 import { AppRoute } from '@/constants/routes';
 
 import { useLaunchableMarkets } from '@/hooks/useLaunchableMarkets';
@@ -18,11 +18,13 @@ import { useAppDispatch, useAppSelector } from '@/state/appTypes';
 import { closeDialogInTradeBox, openDialog } from '@/state/dialogs';
 import { getActiveTradeBoxDialog } from '@/state/dialogsSelectors';
 import { getHasSeenPredictionMarketIntroDialog } from '@/state/dismissableSelectors';
-import { setCurrentMarketId } from '@/state/perpetuals';
-import { getMarketIds } from '@/state/perpetualsSelectors';
+import { setCurrentMarketId, setCurrentMarketIdIfTradeable } from '@/state/perpetuals';
+import { getLaunchedMarketIds, getMarketIds } from '@/state/perpetualsSelectors';
 
 import abacusStateManager from '@/lib/abacus';
-import { testFlags } from '@/lib/testFlags';
+
+import { useMarketsData } from './useMarketsData';
+import { useParameterizedSelector } from './useParameterizedSelector';
 
 export const useCurrentMarketId = () => {
   const navigate = useNavigate();
@@ -33,10 +35,22 @@ export const useCurrentMarketId = () => {
   const openPositions = useAppSelector(getOpenPositions, shallowEqual);
   const marketIds = useAppSelector(getMarketIds, shallowEqual);
   const hasMarketIds = marketIds.length > 0;
+  const abacusHasMarketIds = useAppSelector((s) => s.perpetuals.abacusHasMarkets);
+  const currentMarketOraclePrice = useParameterizedSelector(
+    BonsaiHelpers.markets.createSelectMarketSummaryById,
+    marketId
+  )?.oraclePrice;
+  const hasMarketOraclePrice = currentMarketOraclePrice != null;
   const launchableMarkets = useLaunchableMarkets();
   const activeTradeBoxDialog = useAppSelector(getActiveTradeBoxDialog);
   const hasLoadedLaunchableMarkets = launchableMarkets.data.length > 0;
   const hasSeenPredictionMarketIntroDialog = useAppSelector(getHasSeenPredictionMarketIntroDialog);
+  const launchedMarketIds = useAppSelector(getLaunchedMarketIds, shallowEqual);
+
+  const { filteredMarkets: predictionMarkets } = useMarketsData({
+    filter: MarketFilters.PREDICTION_MARKET,
+    forceHideUnlaunchedMarkets: true,
+  });
 
   const [lastViewedMarket, setLastViewedMarket] = useLocalStorage({
     key: LocalStorageKey.LastViewedMarket,
@@ -56,11 +70,27 @@ export const useCurrentMarketId = () => {
   }, [hasMarketIds, marketId]);
 
   const isViewingUnlaunchedMarket = useMemo(() => {
-    if (!hasLoadedLaunchableMarkets || !testFlags.pml) return false;
+    if (!hasMarketIds || !hasLoadedLaunchableMarkets) return false;
+
+    // Continue displaying unlaunched market view if marketId is in launchedMarketIds state
+    if (marketId && launchedMarketIds.includes(marketId)) {
+      return true;
+    }
+
     return launchableMarkets.data.some((market) => {
       return market.id === marketId;
     });
-  }, [hasLoadedLaunchableMarkets, marketId, launchableMarkets.data]);
+  }, [
+    hasLoadedLaunchableMarkets,
+    hasMarketIds,
+    launchedMarketIds,
+    launchableMarkets.data,
+    marketId,
+  ]);
+
+  const isViewingPredictionMarket = useMemo(() => {
+    return predictionMarkets.some((market) => market.id === marketId);
+  }, [predictionMarkets.length, marketId]);
 
   useEffect(() => {
     // If v4_markets has not been subscribed to yet or marketId is not specified, default to validId
@@ -92,14 +122,14 @@ export const useCurrentMarketId = () => {
         dispatch(setCurrentMarketId(marketId));
 
         // If changed to a prediction market, display Prediction Market explainer
-        if (Object.values(PREDICTION_MARKET).includes(marketId)) {
+        if (isViewingPredictionMarket) {
           onNavigateToPredictionMarket();
         }
 
         if (
           activeTradeBoxDialog != null &&
           TradeBoxDialogTypes.is.ClosePosition(activeTradeBoxDialog) &&
-          openPositions?.find((position: SubaccountPosition) => position.id === marketId)
+          openPositions?.find((position) => position.market === marketId)
         ) {
           // Keep the close positions dialog open between market changes as long as there exists an open position
           return;
@@ -112,14 +142,42 @@ export const useCurrentMarketId = () => {
 
   useEffect(() => {
     // Check for marketIds otherwise Abacus will silently fail its isMarketValid check
-    if (isViewingUnlaunchedMarket) {
-      abacusStateManager.setMarket(DEFAULT_MARKETID);
-      abacusStateManager.setTradeValue({ value: null, field: null });
-    } else if (hasMarketIds) {
-      abacusStateManager.setMarket(marketId ?? DEFAULT_MARKETID);
+    if (abacusHasMarketIds) {
+      if (isViewingUnlaunchedMarket) {
+        abacusStateManager.setMarket(DEFAULT_MARKETID);
+      } else {
+        if (marketId) {
+          const isMarketReadyForSubscription = hasMarketOraclePrice;
+          if (isMarketReadyForSubscription) {
+            abacusStateManager.setMarket(marketId);
+          }
+        } else {
+          abacusStateManager.setMarket(DEFAULT_MARKETID);
+        }
+      }
       abacusStateManager.setTradeValue({ value: null, field: null });
     }
-  }, [isViewingUnlaunchedMarket, selectedNetwork, hasMarketIds, marketId]);
+
+    if (isViewingUnlaunchedMarket) {
+      dispatch(setCurrentMarketIdIfTradeable(undefined));
+    } else {
+      if (marketId) {
+        const isMarketReadyForSubscription = hasMarketOraclePrice;
+        if (isMarketReadyForSubscription) {
+          dispatch(setCurrentMarketIdIfTradeable(marketId));
+        }
+      } else {
+        dispatch(setCurrentMarketIdIfTradeable(undefined));
+      }
+    }
+  }, [
+    isViewingUnlaunchedMarket,
+    selectedNetwork,
+    abacusHasMarketIds,
+    hasMarketOraclePrice,
+    marketId,
+    dispatch,
+  ]);
 
   return {
     isViewingUnlaunchedMarket,

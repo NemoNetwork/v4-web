@@ -19,26 +19,32 @@ import { Link } from '@/components/Link';
 type ElementProps = {
   tooltip?: TooltipStringKeys;
   tooltipString?: string;
+  tooltipStringTitle?: string;
   stringParams?: Record<string, string | undefined>;
   withIcon?: boolean;
   children?: ReactNode;
   slotTooltip?: ReactNode;
+  slotTrigger?: ReactNode;
 };
 
 type StyleProps = {
   align?: 'start' | 'center' | 'end';
   side?: 'top' | 'right' | 'bottom' | 'left';
+  sideOffset?: number;
   className?: string;
 };
 
 export const WithTooltip = ({
   tooltip,
   tooltipString,
+  tooltipStringTitle,
+  slotTrigger,
   stringParams,
   withIcon,
   children,
   align,
   side,
+  sideOffset,
   className,
   slotTooltip,
 }: ElementProps & StyleProps) => {
@@ -47,7 +53,7 @@ export const WithTooltip = ({
   const featureFlags = useAllStatsigGateValues();
 
   const getTooltipStrings: TooltipStrings[string] | undefined = tooltip && tooltipStrings[tooltip];
-  if (!getTooltipStrings && !tooltipString && !slotTooltip) return children;
+  if (!getTooltipStrings && !tooltipString && !slotTooltip && !tooltipStringTitle) return children;
 
   let tooltipTitle;
   let tooltipBody;
@@ -65,20 +71,29 @@ export const WithTooltip = ({
     tooltipLearnMore = learnMoreLink;
   } else {
     tooltipBody = tooltipString;
+    tooltipTitle = tooltipStringTitle;
   }
 
   return (
     <Provider>
       <Root delayDuration={300}>
         <Trigger asChild>
-          <$Abbr>
-            {children}
-            {withIcon && <Icon iconName={IconName.HelpCircle} tw="text-color-text-0" />}
-          </$Abbr>
+          {slotTrigger ?? (
+            <$Abbr>
+              {children}
+              {withIcon && <Icon iconName={IconName.HelpCircle} tw="text-color-text-0" />}
+            </$Abbr>
+          )}
         </Trigger>
 
         <Portal>
-          <$Content sideOffset={8} side={side} align={align} className={className} asChild>
+          <$Content
+            sideOffset={sideOffset ?? 8}
+            side={side}
+            align={align}
+            className={className}
+            asChild
+          >
             {slotTooltip ?? (
               <dl>
                 {tooltipTitle && <dt>{tooltipTitle}</dt>}

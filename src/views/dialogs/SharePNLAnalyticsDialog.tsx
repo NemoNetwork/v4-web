@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 
+import { BonsaiHelpers } from '@/bonsai/ontology';
 import { useToBlob } from '@hugocxl/react-to-image';
 import styled from 'styled-components';
 import tw from 'twin.macro';
@@ -8,8 +9,9 @@ import { AnalyticsEvents } from '@/constants/analytics';
 import { ButtonAction } from '@/constants/buttons';
 import { DialogProps, SharePNLAnalyticsDialogProps } from '@/constants/dialogs';
 import { STRING_KEYS } from '@/constants/localization';
-import { PositionSide } from '@/constants/trade';
+import { IndexerPositionSide } from '@/types/indexer/indexerApiGen';
 
+import { useParameterizedSelector } from '@/hooks/useParameterizedSelector';
 import { useStringGetter } from '@/hooks/useStringGetter';
 
 import { LogoIcon } from '@/icons/logo';
@@ -27,6 +29,7 @@ import { useAppDispatch } from '@/state/appTypes';
 import { closeDialog } from '@/state/dialogs';
 
 import { track } from '@/lib/analytics/analytics';
+import { getDisplayableAssetFromBaseAsset } from '@/lib/assetUtils';
 import { MustBigNumber } from '@/lib/numbers';
 import { triggerTwitterIntent } from '@/lib/twitter';
 
@@ -52,6 +55,9 @@ export const SharePNLAnalyticsDialog = ({
 }: DialogProps<SharePNLAnalyticsDialogProps>) => {
   const stringGetter = useStringGetter();
   const dispatch = useAppDispatch();
+  const logoUrl = useParameterizedSelector(BonsaiHelpers.assets.createSelectAssetLogo, assetId);
+
+  const symbol = getDisplayableAssetFromBaseAsset(assetId);
 
   const [{ isLoading: isCopying }, convert, ref] = useToBlob<HTMLDivElement>({
     quality: 1.0,
@@ -67,9 +73,9 @@ export const SharePNLAnalyticsDialog = ({
         text: `${stringGetter({
           key: STRING_KEYS.TWEET_MARKET_POSITION,
           params: {
-            MARKET: assetId,
+            MARKET: symbol,
           },
-        })}\n\n#dYdX #${assetId}\n[${stringGetter({ key: STRING_KEYS.TWEET_PASTE_IMAGE_AND_DELETE_THIS })}]`,
+        })}\n\n#dYdX #${symbol}\n[${stringGetter({ key: STRING_KEYS.TWEET_PASTE_IMAGE_AND_DELETE_THIS })}]`,
         related: 'dYdX',
       });
 
@@ -78,10 +84,10 @@ export const SharePNLAnalyticsDialog = ({
   });
 
   const sideSign = useMemo(() => {
-    switch (side?.name) {
-      case PositionSide.Long:
+    switch (side) {
+      case IndexerPositionSide.LONG:
         return TagSign.Positive;
-      case PositionSide.Short:
+      case IndexerPositionSide.SHORT:
         return TagSign.Negative;
       default:
         return TagSign.Neutral;
@@ -104,7 +110,7 @@ export const SharePNLAnalyticsDialog = ({
       >
         <div tw="flexColumn h-full">
           <div tw="row mb-0.75 gap-0.5">
-            <AssetIcon symbol={assetId} tw="h-[1.625rem]" />
+            <AssetIcon logoUrl={logoUrl} symbol={assetId} tw="[--asset-icon-size:1.625rem]" />
 
             <span>
               <span tw="text-color-text-2 font-base-bold">{assetLeft}</span>/{assetRight}

@@ -4,8 +4,8 @@ import { THEME_NAMES } from '@/constants/styles/colors';
 import type { ChartLine, TvWidget } from '@/constants/tvchart';
 
 import { useAppSelector } from '@/state/appTypes';
-import { AppColorMode, AppTheme } from '@/state/configs';
-import { getAppColorMode, getAppTheme } from '@/state/configsSelectors';
+import { AppColorMode, AppTheme } from '@/state/appUiConfigs';
+import { getAppColorMode, getAppTheme } from '@/state/appUiConfigsSelectors';
 
 import { assertNever } from '@/lib/assertNever';
 import { getChartLineColors, getWidgetOverrides } from '@/lib/tradingView/utils';
@@ -26,36 +26,36 @@ const isIFrame = (element: HTMLElement | null): element is HTMLIFrameElement =>
 export const useTradingViewTheme = ({
   chartLines,
   tvWidget,
-  isWidgetReady,
 }: {
   chartLines?: Record<string, ChartLine>;
-  tvWidget: TvWidget | null;
-  isWidgetReady?: boolean;
+  tvWidget?: TvWidget;
 }) => {
   const appTheme: AppTheme = useAppSelector(getAppTheme);
   const appColorMode: AppColorMode = useAppSelector(getAppColorMode);
 
   useEffect(() => {
-    if (tvWidget && isWidgetReady) {
-      tvWidget.changeTheme?.(THEME_NAMES[appTheme]).then(() => {
-        const tvChartId = tvWidget?._id;
+    if (!tvWidget) return;
+
+    tvWidget.onChartReady(() => {
+      tvWidget.changeTheme(THEME_NAMES[appTheme]).then(() => {
+        const tvChartId = tvWidget._id;
 
         if (tvChartId) {
-          const frame = document?.getElementById(tvChartId);
+          const frame = document.getElementById(tvChartId);
 
           if (isIFrame(frame) && frame.contentWindow) {
             const innerHtml = frame.contentWindow.document.documentElement;
             switch (appTheme) {
               case AppTheme.Classic:
-                innerHtml?.classList.remove('theme-dark', 'theme-light');
+                innerHtml.classList.remove('theme-dark', 'theme-light');
                 break;
               case AppTheme.Dark:
-                innerHtml?.classList.remove('theme-light');
-                innerHtml?.classList.add('theme-dark');
+                innerHtml.classList.remove('theme-light');
+                innerHtml.classList.add('theme-dark');
                 break;
               case AppTheme.Light:
-                innerHtml?.classList.remove('theme-dark');
-                innerHtml?.classList.add('theme-light');
+                innerHtml.classList.remove('theme-dark');
+                innerHtml.classList.add('theme-light');
                 break;
               default:
                 assertNever(appTheme);
@@ -66,17 +66,17 @@ export const useTradingViewTheme = ({
 
         // eslint-disable-next-line @typescript-eslint/naming-convention
         const { overrides, studies_overrides } = getWidgetOverrides({ appTheme, appColorMode });
-        tvWidget?.applyOverrides(overrides);
-        tvWidget?.applyStudiesOverrides(studies_overrides);
+        tvWidget.applyOverrides(overrides);
+        tvWidget.applyStudiesOverrides(studies_overrides);
 
         // Necessary to update existing indicators
         const volumeStudyId = tvWidget
-          ?.activeChart()
-          ?.getAllStudies()
-          ?.find((x) => x.name === 'Volume')?.id;
+          .activeChart()
+          .getAllStudies()
+          .find((x) => x.name === 'Volume')?.id;
 
         if (volumeStudyId) {
-          const volume = tvWidget?.activeChart()?.getStudyById(volumeStudyId);
+          const volume = tvWidget.activeChart().getStudyById(volumeStudyId);
           volume.applyOverrides({
             'volume.color.0': studies_overrides['volume.volume.color.0'],
             'volume.color.1': studies_overrides['volume.volume.color.1'],
@@ -102,6 +102,6 @@ export const useTradingViewTheme = ({
           });
         }
       });
-    }
-  }, [appTheme, appColorMode, isWidgetReady]);
+    });
+  }, [appTheme, appColorMode, tvWidget]);
 };

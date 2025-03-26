@@ -1,10 +1,12 @@
 import { useCallback, useMemo } from 'react';
 
+import { BonsaiHelpers } from '@/bonsai/ontology';
 import { shallowEqual } from 'react-redux';
 
 import { CancelPendingOrdersDialogProps, DialogProps } from '@/constants/dialogs';
 import { STRING_KEYS } from '@/constants/localization';
 
+import { useParameterizedSelector } from '@/hooks/useParameterizedSelector';
 import { useStringGetter } from '@/hooks/useStringGetter';
 
 import { AssetIcon } from '@/components/AssetIcon';
@@ -26,16 +28,21 @@ export const CancelPendingOrdersDialog = ({
     [allPending, marketId]
   );
 
-  const onSuccessfulCancel = useCallback(() => setIsOpen?.(false), [setIsOpen]);
+  const logoUrl = useParameterizedSelector(
+    BonsaiHelpers.assets.createSelectAssetLogo,
+    pendingPosition?.assetId
+  );
+
+  const onSuccessfulCancel = useCallback(() => setIsOpen(false), [setIsOpen]);
 
   return (
     <Dialog
       isOpen
       setIsOpen={setIsOpen}
-      slotIcon={pendingPosition && <AssetIcon symbol={pendingPosition.assetId} />}
+      slotIcon={pendingPosition && <AssetIcon logoUrl={logoUrl} symbol={pendingPosition.assetId} />}
       title={stringGetter({
         key:
-          (pendingPosition?.orderCount ?? 0) !== 1
+          (pendingPosition?.orders.length ?? 0) !== 1
             ? STRING_KEYS.CANCEL_ORDERS
             : STRING_KEYS.CANCEL_ORDER,
       })}

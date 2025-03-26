@@ -1,8 +1,11 @@
 import { SupportedLocale } from '@dydxprotocol/v4-localization';
+import { RouteResponse } from '@skip-go/client';
 import { RecordOf, TagsOf, UnionOf, ofType, unionize } from 'unionize';
 
 import { StatsigFlags } from '@/constants/statsig';
 import { ConnectorType, WalletType } from '@/constants/wallets';
+
+import type { Deposit, Withdraw } from '@/state/transfers';
 
 import type { AbacusApiStatus, HumanReadablePlaceOrderPayload } from './abacus';
 import type { OnboardingState, OnboardingSteps } from './account';
@@ -69,10 +72,14 @@ export const AnalyticsUserProperties = unionize(
     WalletType: ofType<WalletType | string | null>(),
     WalletConnectorType: ofType<ConnectorType | null>(),
     WalletAddress: ofType<string | null>(),
+    IsRememberMe: ofType<boolean | null>(),
 
     // Account
     DydxAddress: ofType<DydxAddress | null>(),
     SubaccountNumber: ofType<number | null>(),
+
+    // Affiliate
+    AffiliateAddress: ofType<string | null>(),
   },
   { tag: 'type' as const, value: 'payload' as const }
 );
@@ -88,8 +95,10 @@ export const AnalyticsUserPropertyLoggableTypes = {
   WalletType: 'walletType',
   WalletConnectorType: 'walletConnectorType',
   WalletAddress: 'walletAddress',
+  IsRememberMe: 'isRememberMe',
   DydxAddress: 'dydxAddress',
   SubaccountNumber: 'subaccountNumber',
+  AffiliateAddress: 'affiliateAddress',
 } as const satisfies Record<AnalyticsUserPropertyTypes, string>;
 
 export type AnalyticsUserProperty = UnionOf<typeof AnalyticsUserProperties>;
@@ -135,6 +144,7 @@ export const AnalyticsEvents = unionize(
     // Navigation
     NavigatePage: ofType<{
       path: string;
+      previousPath: string;
     }>(),
     NavigateDialog: ofType<{
       type: DialogTypesTypes;
@@ -211,6 +221,7 @@ export const AnalyticsEvents = unionize(
       estimatedRouteDuration?: number;
       toAmount?: number;
       toAmountMin?: number;
+      isFunkit?: boolean;
     }>(),
     TransferWithdraw: ofType<{
       chainId?: string;
@@ -316,7 +327,7 @@ export const AnalyticsEvents = unionize(
 
     Error: ofType<{
       location: string;
-      error: Error;
+      error?: Error;
       metadata?: any;
     }>(),
     RouteError: ofType<{
@@ -328,6 +339,7 @@ export const AnalyticsEvents = unionize(
       assetSymbol?: string;
       assetName?: string;
     }>(),
+    WebsocketParseError: ofType<{ message: string }>(),
 
     // vaults
     ClickViewVaultFromPositionCard: ofType<{}>(),
@@ -337,16 +349,97 @@ export const AnalyticsEvents = unionize(
     VaultFormPreviewStep: ofType<{ operation: 'DEPOSIT' | 'WITHDRAW'; amount: number }>(),
     AttemptVaultOperation: ofType<{
       operation: 'DEPOSIT' | 'WITHDRAW';
+      userOperationId: string;
       amount: number;
       slippage: number | null | undefined;
+      requiredSlippageAck: boolean | null | undefined;
+      showedSlippageWarning: boolean | null | undefined;
     }>(),
-    VaultOperationPreAborted: ofType<{ operation: 'DEPOSIT' | 'WITHDRAW'; amount: number }>(),
+    VaultOperationPreAborted: ofType<{
+      operation: 'DEPOSIT' | 'WITHDRAW';
+      userOperationId: string;
+      amount: number;
+    }>(),
     SuccessfulVaultOperation: ofType<{
       operation: 'DEPOSIT' | 'WITHDRAW';
+      userOperationId: string;
       amount: number;
       amountDiff: number | null | undefined;
+      submissionTimeBase: number;
+      submissionTimeTotal: number;
     }>(),
-    VaultOperationProtocolError: ofType<{ operation: 'DEPOSIT' | 'WITHDRAW' }>(),
+    VaultOperationProtocolError: ofType<{
+      operation: 'DEPOSIT' | 'WITHDRAW';
+      userOperationId: string;
+    }>(),
+
+    // Affiliate
+    AffiliateInviteFriendsModalOpened: ofType<{ isAffiliateEligible: boolean }>(),
+    AffiliateRegistration: ofType<{ affiliateAddress: string }>(),
+    AffiliateRemoveSavedReferralAddress: ofType<{
+      affiliateAddress: string;
+      reason: AffiliateRemovalReason;
+    }>(),
+    AffiliateSaveReferralAddress: ofType<{ affiliateAddress: string }>(),
+    AffiliateURLCopied: ofType<{ url: string }>(),
+
+    // Favoriting Markets
+    FavoriteMarket: ofType<{ marketId: string }>(),
+    UnfavoriteMarket: ofType<{ marketId: string }>(),
+
+    // Launching Markets
+    LaunchMarketFormSelectedAsset: ofType<{ asset: string }>(),
+    LaunchMarketFormStepChange: ofType<{
+      currentStep: number;
+      updatedStep: number;
+      ticker?: string;
+      userFreeCollateral?: number;
+    }>(),
+    LaunchMarketPageChangePriceChartTimeframe: ofType<{ timeframe: string; asset: string }>(),
+    LaunchMarketTransaction: ofType<{ marketId: string }>(),
+    LaunchMarketViewFromTradePage: ofType<{ marketId: string }>(),
+
+    // Deposit
+    DepositInitiated:
+      ofType<
+        Pick<
+          RouteResponse,
+          | 'sourceAssetDenom'
+          | 'sourceAssetChainID'
+          | 'amountIn'
+          | 'amountOut'
+          | 'usdAmountOut'
+          | 'estimatedAmountOut'
+          | 'swapPriceImpactPercent'
+          | 'estimatedRouteDurationSeconds'
+        >
+      >(),
+    DepositSubmitted: ofType<
+      Omit<Deposit, 'token'> & { tokenInChainId: string; tokenInDenom: string }
+    >(),
+    DepositFinalized: ofType<
+      Omit<Deposit, 'token'> & { tokenInChainId: string; tokenInDenom: string }
+    >(),
+    DepositError: ofType<{ error: string }>(),
+
+    // Withdraw
+    WithdrawInitiated:
+      ofType<
+        Pick<
+          RouteResponse,
+          | 'sourceAssetDenom'
+          | 'sourceAssetChainID'
+          | 'amountIn'
+          | 'amountOut'
+          | 'usdAmountOut'
+          | 'estimatedAmountOut'
+          | 'swapPriceImpactPercent'
+          | 'estimatedRouteDurationSeconds'
+        >
+      >(),
+    WithdrawSubmitted: ofType<Withdraw>(),
+    WithdrawFinalized: ofType<Withdraw>(),
+    WithdrawError: ofType<{ error: string }>(),
   },
   { tag: 'type' as const, value: 'payload' as const }
 );
@@ -362,6 +455,13 @@ export enum TransactionMemo {
 
   placeOrder = `${DEFAULT_TRANSACTION_MEMO} | Place Order`,
   cancelOrderTransfer = `${DEFAULT_TRANSACTION_MEMO} | Cancel Order`,
+
+  launchMarket = `${DEFAULT_TRANSACTION_MEMO} | Launch Market`,
+}
+
+export enum AffiliateRemovalReason {
+  OwnReferralCode = 'own_referral_code',
+  AffiliateAlreadyRegistered = 'affiliate_already_registered',
 }
 
 export const lastSuccessfulRestRequestByOrigin: Record<URL['origin'], number> = {};

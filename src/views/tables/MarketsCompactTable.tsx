@@ -18,152 +18,216 @@ import { tradeViewMixins } from '@/styles/tradeViewMixins';
 import { Icon, IconName } from '@/components/Icon';
 import { LoadingSpace } from '@/components/Loading/LoadingSpinner';
 import { Output, OutputType } from '@/components/Output';
-import { Table, type ColumnDef } from '@/components/Table';
+import { ColumnDef, Table } from '@/components/Table';
 import { AssetTableCell } from '@/components/Table/AssetTableCell';
 import { TableCell } from '@/components/Table/TableCell';
 import { NewTag } from '@/components/Tag';
 import { TriangleIndicator } from '@/components/TriangleIndicator';
 
+import { getDisplayableAssetFromBaseAsset } from '@/lib/assetUtils';
+import { isTruthy } from '@/lib/isTruthy';
 import { MustBigNumber } from '@/lib/numbers';
 
 interface MarketsCompactTableProps {
   className?: string;
-  filters?: MarketFilters;
   sorting?: MarketSorting;
 }
 
 export const MarketsCompactTable = ({
   className,
-  filters,
   sorting,
 }: PropsWithChildren<MarketsCompactTableProps>) => {
   const stringGetter = useStringGetter();
-  const { isTablet } = useBreakpoints();
   const navigate = useNavigate();
+  const { isMobile } = useBreakpoints();
 
-  const { filteredMarkets } = useMarketsData(filters);
+  const { filteredMarkets } = useMarketsData({
+    filter: sorting === MarketSorting.RECENTLY_LISTED ? MarketFilters.NEW : MarketFilters.ALL,
+    forceHideUnlaunchedMarkets: true,
+  });
 
-  const columns = useMemo<ColumnDef<MarketData>[]>(
-    () =>
-      [
-        {
-          columnKey: 'market',
-          allowsSorting: false,
-          label: stringGetter({ key: STRING_KEYS.MARKET }),
-          renderCell: ({
-            assetId,
-            effectiveInitialMarginFraction,
-            initialMarginFraction,
-            name,
-          }) => (
-            <AssetTableCell
-              stacked
-              configs={{ effectiveInitialMarginFraction, initialMarginFraction }}
-              name={name}
-              symbol={assetId}
-            />
-          ),
-        },
-        {
-          columnKey: 'oraclePrice',
-          allowsSorting: false,
-          label: stringGetter({ key: STRING_KEYS.ORACLE_PRICE }),
-          renderCell: ({
-            oraclePrice,
-            priceChange24H,
-            priceChange24HPercent,
-            tickSizeDecimals,
-          }) => (
-            <TableCell stacked>
-              <Output
-                withBaseFont
-                withSubscript
-                type={OutputType.Fiat}
-                value={oraclePrice}
-                fractionDigits={tickSizeDecimals}
-                tw="text-color-text-1 font-small-medium"
+  const columns = useMemo(() => {
+    return sorting === MarketSorting.RECENTLY_LISTED
+      ? [
+          {
+            columnKey: 'market',
+            allowsSorting: false,
+            label: stringGetter({ key: STRING_KEYS.MARKET }),
+            renderCell: ({
+              assetId,
+              effectiveInitialMarginFraction,
+              logo,
+              initialMarginFraction,
+              name,
+            }: MarketData) => (
+              <AssetTableCell
+                configs={{ logo, effectiveInitialMarginFraction, initialMarginFraction }}
+                name={name}
+                symbol={assetId}
+                truncateAssetName
               />
-              <$TabletPriceChange>
-                {!priceChange24H ? (
-                  <Output type={OutputType.Fiat} value={null} />
-                ) : (
-                  <>
-                    {priceChange24H > 0 && (
-                      <TriangleIndicator value={MustBigNumber(priceChange24H)} />
-                    )}
-                    <$Output
-                      type={OutputType.Percent}
-                      value={MustBigNumber(priceChange24HPercent).abs()}
-                      isPositive={MustBigNumber(priceChange24HPercent).gt(0)}
-                      isNegative={MustBigNumber(priceChange24HPercent).isNegative()}
-                    />
-                  </>
-                )}
-              </$TabletPriceChange>
-            </TableCell>
-          ),
-        },
-        sorting === MarketSorting.HIGHEST_CLOB_PAIR_ID
-          ? {
-              columnKey: 'listing',
-              allowsSorting: false,
-              label: undefined,
-              renderCell: ({ isNew }) => (
-                <$DetailsCell>
-                  {isNew && (
-                    <$RecentlyListed>
-                      <NewTag>{stringGetter({ key: STRING_KEYS.NEW })}</NewTag>
-                    </$RecentlyListed>
+            ),
+          },
+          {
+            columnKey: 'oraclePrice',
+            allowsSorting: false,
+            label: stringGetter({ key: STRING_KEYS.ORACLE_PRICE }),
+            renderCell: ({
+              oraclePrice,
+              priceChange24h,
+              percentChange24h,
+              tickSizeDecimals,
+            }: MarketData) => (
+              <TableCell stacked>
+                <Output
+                  withBaseFont
+                  withSubscript
+                  type={OutputType.Fiat}
+                  value={oraclePrice}
+                  fractionDigits={tickSizeDecimals}
+                  tw="text-color-text-1 font-small-medium"
+                />
+                <$TabletPriceChange>
+                  {!priceChange24h ? (
+                    <Output type={OutputType.Fiat} value={null} />
+                  ) : (
+                    <>
+                      {priceChange24h > 0 && (
+                        <TriangleIndicator value={MustBigNumber(priceChange24h)} />
+                      )}
+                      <$Output
+                        type={OutputType.Percent}
+                        value={MustBigNumber(percentChange24h).abs()}
+                        isPositive={MustBigNumber(percentChange24h).gt(0)}
+                        isNegative={MustBigNumber(percentChange24h).isNegative()}
+                      />
+                    </>
                   )}
-                  <Icon iconName={IconName.ChevronRight} />
-                </$DetailsCell>
-              ),
-            }
-          : {
-              columnKey: 'openInterest',
-              allowsSorting: false,
-              label: stringGetter({ key: STRING_KEYS.OPEN_INTEREST }),
-              renderCell: ({ assetId, openInterestUSDC, openInterest }) => (
-                <$DetailsCell>
+                </$TabletPriceChange>
+              </TableCell>
+            ),
+          },
+          !isMobile && {
+            columnKey: 'listing',
+            allowsSorting: false,
+            label: undefined,
+            renderCell: ({ isNew }: MarketData) => (
+              <$DetailsCell>
+                {isNew && (
                   <$RecentlyListed>
-                    <Output type={OutputType.CompactFiat} value={openInterestUSDC} />
-                    <Output
-                      type={OutputType.CompactNumber}
-                      value={openInterest}
-                      slotRight={` ${assetId}`}
-                      tw="text-color-text-0 font-mini-medium"
-                    />
+                    <NewTag>{stringGetter({ key: STRING_KEYS.NEW })}</NewTag>
                   </$RecentlyListed>
-                  <Icon iconName={IconName.ChevronRight} />
-                </$DetailsCell>
-              ),
-            },
-      ] satisfies ColumnDef<MarketData>[],
-    [stringGetter, isTablet]
-  );
+                )}
+                <Icon iconName={IconName.ChevronRight} />
+              </$DetailsCell>
+            ),
+          },
+        ].filter(isTruthy)
+      : [
+          {
+            columnKey: 'market',
+            allowsSorting: false,
+            label: stringGetter({ key: STRING_KEYS.MARKET }),
+            renderCell: ({
+              assetId,
+              effectiveInitialMarginFraction,
+              logo,
+              initialMarginFraction,
+              name,
+            }: MarketData) => (
+              <AssetTableCell
+                configs={{ logo, effectiveInitialMarginFraction, initialMarginFraction }}
+                name={name}
+                symbol={assetId}
+                truncateAssetName
+              />
+            ),
+          },
+          {
+            columnKey: 'oraclePrice',
+            allowsSorting: false,
+            label: stringGetter({ key: STRING_KEYS.ORACLE_PRICE }),
+            renderCell: ({
+              oraclePrice,
+              priceChange24h,
+              percentChange24h,
+              tickSizeDecimals,
+            }: MarketData) => (
+              <TableCell stacked>
+                <Output
+                  withBaseFont
+                  withSubscript
+                  type={OutputType.Fiat}
+                  value={oraclePrice}
+                  fractionDigits={tickSizeDecimals}
+                  tw="text-color-text-1 font-small-medium"
+                />
+                <$TabletPriceChange>
+                  {!percentChange24h ? (
+                    <Output type={OutputType.Fiat} value={null} />
+                  ) : (
+                    <>
+                      {percentChange24h > 0 && (
+                        <TriangleIndicator value={MustBigNumber(priceChange24h)} />
+                      )}
+                      <$Output
+                        type={OutputType.Percent}
+                        value={MustBigNumber(percentChange24h).abs()}
+                        isPositive={MustBigNumber(percentChange24h).gt(0)}
+                        isNegative={MustBigNumber(percentChange24h).isNegative()}
+                      />
+                    </>
+                  )}
+                </$TabletPriceChange>
+              </TableCell>
+            ),
+          },
+          !isMobile && {
+            columnKey: 'openInterest',
+            allowsSorting: false,
+            label: stringGetter({ key: STRING_KEYS.OPEN_INTEREST }),
+            renderCell: ({ assetId, openInterestUSDC, openInterest }: MarketData) => (
+              <$DetailsCell>
+                <$RecentlyListed>
+                  <Output type={OutputType.CompactFiat} value={openInterestUSDC} />
+                  <Output
+                    type={OutputType.CompactNumber}
+                    value={openInterest}
+                    slotRight={` ${getDisplayableAssetFromBaseAsset(assetId)}`}
+                    tw="text-color-text-0 font-mini-medium"
+                  />
+                </$RecentlyListed>
+                <Icon iconName={IconName.ChevronRight} />
+              </$DetailsCell>
+            ),
+          },
+        ].filter(isTruthy);
+  }, [isMobile, stringGetter, sorting]) as ColumnDef<MarketData>[];
 
   const sortedMarkets = useMemo(() => {
-    if (sorting === MarketSorting.HIGHEST_CLOB_PAIR_ID) {
-      return filteredMarkets.sort((a, b) => b.clobPairId - a.clobPairId);
+    if (sorting === MarketSorting.RECENTLY_LISTED) {
+      return filteredMarkets.sort(
+        (a, b) => (a.sparkline24h?.length ?? 0) - (b.sparkline24h?.length ?? 0)
+      );
     }
 
     if (sorting === MarketSorting.GAINERS || sorting === MarketSorting.LOSERS) {
       const sortingFunction = (marketA: MarketData, marketB: MarketData) => {
-        if (marketA.priceChange24HPercent == null && marketB.priceChange24HPercent == null) {
+        if (marketA.percentChange24h == null && marketB.percentChange24h == null) {
           return 0;
         }
 
-        if (marketA.priceChange24HPercent == null) {
+        if (marketA.percentChange24h == null) {
           return 1;
         }
 
-        if (marketB.priceChange24HPercent == null) {
+        if (marketB.percentChange24h == null) {
           return -1;
         }
 
         return sorting === MarketSorting.GAINERS
-          ? marketB.priceChange24HPercent - marketA.priceChange24HPercent
-          : marketA.priceChange24HPercent - marketB.priceChange24HPercent;
+          ? marketB.percentChange24h - marketA.percentChange24h
+          : marketA.percentChange24h - marketB.percentChange24h;
       };
 
       return filteredMarkets.sort(sortingFunction);
@@ -176,8 +240,9 @@ export const MarketsCompactTable = ({
     <$Table
       withInnerBorders
       data={sortedMarkets.slice(0, 3)}
-      getRowKey={(row) => row.id ?? ''}
+      getRowKey={(row) => row.id}
       label="Markets"
+      tableId="markets-compact"
       onRowAction={(market: Key) =>
         navigate(`${AppRoute.Trade}/${market}`, { state: { from: AppRoute.Markets } })
       }
@@ -185,11 +250,7 @@ export const MarketsCompactTable = ({
       className={className}
       slotEmpty={
         <$MarketNotFound>
-          {filters === MarketFilters.NEW ? (
-            <p>{stringGetter({ key: STRING_KEYS.NO_RECENTLY_LISTED_MARKETS })}</p>
-          ) : (
-            <LoadingSpace id="compact-markets-table" />
-          )}
+          <LoadingSpace id="compact-markets-table" />
         </$MarketNotFound>
       }
       initialPageSize={5}
@@ -201,7 +262,7 @@ const $Table = styled(Table)`
   ${tradeViewMixins.horizontalTable}
   --tableCell-padding: 0.625rem 1.25rem;
   --tableRow-backgroundColor: var(--color-layer-3);
-  --tableHeader-backgroundColor: var(--color-layer-3);
+
   border-bottom-right-radius: 0.625rem;
   border-bottom-left-radius: 0.625rem;
 

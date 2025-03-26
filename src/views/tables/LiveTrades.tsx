@@ -1,13 +1,14 @@
 import { useMemo } from 'react';
 
+import { BonsaiHelpers, BonsaiHooks } from '@/bonsai/ontology';
+import { LiveTrade } from '@/bonsai/types/summaryTypes';
 import { OrderSide } from '@nemo-network/v4-client-js/src';
-import { shallowEqual } from 'react-redux';
 import styled, { css, keyframes } from 'styled-components';
 
-import { MarketTrade } from '@/constants/abacus';
 import { STRING_KEYS } from '@/constants/localization';
 import { TOKEN_DECIMALS } from '@/constants/numbers';
 import { EMPTY_ARR } from '@/constants/objects';
+import { IndexerOrderSide } from '@/types/indexer/indexerApiGen';
 
 import { useBreakpoints } from '@/hooks/useBreakpoints';
 import { useLocaleSeparators } from '@/hooks/useLocaleSeparators';
@@ -19,14 +20,12 @@ import { LoadingSpace } from '@/components/Loading/LoadingSpinner';
 import { Output, OutputType } from '@/components/Output';
 
 import { useAppSelector } from '@/state/appTypes';
-import { getCurrentMarketAssetData } from '@/state/assetsSelectors';
 import { getSelectedLocale } from '@/state/localizationSelectors';
-import { getCurrentMarketConfig, getCurrentMarketLiveTrades } from '@/state/perpetualsSelectors';
 
 import { getConsistentAssetSizeString } from '@/lib/consistentAssetSize';
 import { getSimpleStyledOutputType } from '@/lib/genericFunctionalComponentUtils';
 import { isTruthy } from '@/lib/isTruthy';
-import { getSelectedOrderSide } from '@/lib/tradeData';
+import { MaybeBigNumber, MustBigNumber } from '@/lib/numbers';
 
 import { OrderbookTradesOutput, OrderbookTradesTable } from './OrderbookTradesTable';
 
@@ -40,7 +39,7 @@ type StyleProps = {
 
 // Current fix for styled-component not preserving generic row
 type RowData = {
-  key: number;
+  key: string;
   createdAtMilliseconds: number;
   price: number;
   side: OrderSide;
@@ -50,24 +49,32 @@ type RowData = {
 export const LiveTrades = ({ className, histogramSide = 'left' }: StyleProps) => {
   const stringGetter = useStringGetter();
   const { isTablet } = useBreakpoints();
-  const currentMarketAssetData = useAppSelector(getCurrentMarketAssetData, shallowEqual);
-  const currentMarketConfig = useAppSelector(getCurrentMarketConfig, shallowEqual);
+  const currentMarketConfig = useAppSelector(BonsaiHelpers.currentMarket.stableMarketInfo);
   const currentMarketLiveTrades =
-    useAppSelector(getCurrentMarketLiveTrades, shallowEqual) ?? EMPTY_ARR;
+    BonsaiHooks.useCurrentMarketLiveTrades().data?.trades ?? EMPTY_ARR;
 
-  const { id = '' } = currentMarketAssetData ?? {};
-  const { stepSizeDecimals, tickSizeDecimals, stepSize } = currentMarketConfig ?? {};
+  const {
+    stepSizeDecimals,
+    tickSizeDecimals,
+    stepSize,
+    displayableAsset: displayableAssetId,
+  } = currentMarketConfig ?? {};
   const { decimal: decimalSeparator, group: groupSeparator } = useLocaleSeparators();
   const selectedLocale = useAppSelector(getSelectedLocale);
 
-  const rows = currentMarketLiveTrades.map(
-    ({ createdAtMilliseconds, price, size, side }: MarketTrade, idx) => ({
-      key: idx,
-      createdAtMilliseconds,
-      price,
-      side: getSelectedOrderSide(side),
-      size,
-    })
+  const rows = useMemo(
+    () =>
+      currentMarketLiveTrades.map(
+        ({ createdAt, price, size, side, id }: LiveTrade): RowData => ({
+          key: id,
+          createdAtMilliseconds: new Date(createdAt).getTime(),
+          price: MustBigNumber(price).toNumber(),
+          // todo use same helper as the horizontal panel files
+          side: side === IndexerOrderSide.BUY ? OrderSide.BUY : OrderSide.SELL,
+          size: MustBigNumber(size).toNumber(),
+        })
+      ),
+    [currentMarketLiveTrades]
   );
 
   const columns = useMemo(() => {
@@ -103,7 +110,7 @@ export const LiveTrades = ({ className, histogramSide = 'left' }: StyleProps) =>
         columnKey: 'size',
         getCellValue: (row: RowData) => row.size,
         label: stringGetter({ key: STRING_KEYS.SIZE }),
-        tag: id,
+        tag: displayableAssetId,
         renderCell: (row: RowData) => (
           <Output
             type={OutputType.Text}
@@ -111,7 +118,7 @@ export const LiveTrades = ({ className, histogramSide = 'left' }: StyleProps) =>
               decimalSeparator,
               groupSeparator,
               selectedLocale,
-              stepSize: stepSize ?? 10 ** (-1 * TOKEN_DECIMALS),
+              stepSize: MaybeBigNumber(stepSize)?.toNumber() ?? 10 ** (-1 * TOKEN_DECIMALS),
               stepSizeDecimals: stepSizeDecimals ?? TOKEN_DECIMALS,
             })}
             tw="text-[color:--accent-color] tablet:text-color-text-1"
@@ -134,12 +141,23 @@ export const LiveTrades = ({ className, histogramSide = 'left' }: StyleProps) =>
       },
       !isTablet && timeColumn,
     ].filter(isTruthy);
-  }, [stepSizeDecimals, tickSizeDecimals, id, histogramSide, stringGetter]);
+  }, [
+    stringGetter,
+    isTablet,
+    displayableAssetId,
+    decimalSeparator,
+    groupSeparator,
+    selectedLocale,
+    stepSize,
+    stepSizeDecimals,
+    tickSizeDecimals,
+  ]);
 
   return (
     <$LiveTradesTable
       className={className}
       key="live-trades"
+      tableId="live-trades"
       label="Recent Trades"
       data={rows}
       columns={columns}

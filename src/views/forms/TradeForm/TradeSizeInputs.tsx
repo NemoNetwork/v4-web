@@ -1,5 +1,6 @@
 import { useCallback, useEffect } from 'react';
 
+import { BonsaiHelpers } from '@/bonsai/ontology';
 import { debounce } from 'lodash';
 import { shallowEqual } from 'react-redux';
 import styled from 'styled-components';
@@ -30,9 +31,8 @@ import { WithTooltip } from '@/components/WithTooltip';
 
 import { getIsAccountConnected } from '@/state/accountSelectors';
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
-import { getCurrentMarketAssetData } from '@/state/assetsSelectors';
-import { setDisplayUnit } from '@/state/configs';
-import { getSelectedDisplayUnit } from '@/state/configsSelectors';
+import { setDisplayUnit } from '@/state/appUiConfigs';
+import { getSelectedDisplayUnit } from '@/state/appUiConfigsSelectors';
 import { setTradeFormInputs } from '@/state/inputs';
 import {
   getInputTradeOptions,
@@ -40,12 +40,14 @@ import {
   getTradeFormInputs,
 } from '@/state/inputsSelectors';
 import { getSelectedLocale } from '@/state/localizationSelectors';
-import { getCurrentMarketConfig } from '@/state/perpetualsSelectors';
 
 import abacusStateManager from '@/lib/abacus';
+import { getDisplayableAssetFromBaseAsset } from '@/lib/assetUtils';
 import { MustBigNumber } from '@/lib/numbers';
+import { orEmptyObj } from '@/lib/typeUtils';
 
 import { MarketLeverageInput } from './MarketLeverageInput';
+import { TargetLeverageInput } from './TargetLeverageInput';
 import { TradePercentSizeToggle } from './TradePercentSizeToggle';
 
 export const TradeSizeInputs = () => {
@@ -53,13 +55,14 @@ export const TradeSizeInputs = () => {
   const stringGetter = useStringGetter();
   const { decimal: decimalSeparator, group: groupSeparator } = useLocaleSeparators();
 
-  const { id } = useAppSelector(getCurrentMarketAssetData, shallowEqual) ?? {};
   const inputTradeSizeData = useAppSelector(getInputTradeSizeData, shallowEqual);
   const currentTradeInputOptions = useAppSelector(getInputTradeOptions, shallowEqual);
   const selectedLocale = useAppSelector(getSelectedLocale);
 
-  const { stepSizeDecimals, tickSizeDecimals } =
-    useAppSelector(getCurrentMarketConfig, shallowEqual) ?? {};
+  const { stepSizeDecimals, tickSizeDecimals, assetId, displayableAsset } = orEmptyObj(
+    useAppSelector(BonsaiHelpers.currentMarket.stableMarketInfo)
+  );
+
   const {
     size,
     usdcSize,
@@ -67,7 +70,8 @@ export const TradeSizeInputs = () => {
     balancePercent,
     input: lastEditedInput,
   } = inputTradeSizeData ?? {};
-  const { needsBalancePercent, needsLeverage } = currentTradeInputOptions ?? {};
+  const { needsBalancePercent, needsLeverage, needsTargetLeverage } =
+    currentTradeInputOptions ?? {};
   const decimals = stepSizeDecimals ?? TOKEN_DECIMALS;
 
   const { amountInput, usdAmountInput, leverageInput, balancePercentInput } = useAppSelector(
@@ -140,8 +144,8 @@ export const TradeSizeInputs = () => {
   };
 
   const dispatchSetDisplayUnit = debounce((newDisplayUnit) => {
-    if (!id) return;
-    dispatch(setDisplayUnit({ newDisplayUnit, entryPoint: 'tradeAmountInput', assetId: id }));
+    if (!assetId) return;
+    dispatch(setDisplayUnit({ newDisplayUnit, entryPoint: 'tradeAmountInput', assetId }));
   }, NORMAL_DEBOUNCE_MS);
 
   const onUsdcToggle = useCallback(
@@ -161,13 +165,13 @@ export const TradeSizeInputs = () => {
   }, [showUSDInput]);
 
   const inputToggleButton = () => {
-    const slotTooltip =
+    const conversionText =
       !showUSDInput && usdAmountInput ? (
-        <$Tooltip>{`≈ ${formatNumberOutput(usdAmountInput, OutputType.Fiat, { decimalSeparator, groupSeparator, selectedLocale })}`}</$Tooltip>
+        <$Conversion>{`≈ ${formatNumberOutput(usdAmountInput, OutputType.Fiat, { decimalSeparator, groupSeparator, selectedLocale })}`}</$Conversion>
       ) : showUSDInput && amountInput ? (
-        <$Tooltip>
-          ≈ {amountInput} {id && <Tag>{id}</Tag>}
-        </$Tooltip>
+        <$Conversion>
+          ≈ {amountInput} {displayableAsset && <Tag tw="ml-0.25">{displayableAsset}</Tag>}
+        </$Conversion>
       ) : undefined;
 
     const toggleButton = (
@@ -181,12 +185,25 @@ export const TradeSizeInputs = () => {
       </$ToggleButton>
     );
 
-    return slotTooltip ? (
-      <WithTooltip slotTooltip={slotTooltip} side="left" align="center">
-        {toggleButton}
-      </WithTooltip>
-    ) : (
-      toggleButton
+    const conversionContainer = (
+      <div
+        tw="pointer-events-none absolute z-10 select-none text-nowrap pr-0.5 font-small-book"
+        style={{ right: '100%' }}
+      >
+        {conversionText}
+      </div>
+    );
+    return (
+      <div tw="row relative gap-0.5">
+        {conversionText ? (
+          <>
+            {conversionContainer}
+            {toggleButton}
+          </>
+        ) : (
+          toggleButton
+        )}
+      </div>
     );
   };
 
@@ -214,12 +231,12 @@ export const TradeSizeInputs = () => {
         <>
           <WithTooltip
             tooltip={inputConfig.tooltipId as TooltipStringKeys}
-            stringParams={{ SYMBOL: id ?? '' }}
+            stringParams={{ SYMBOL: getDisplayableAssetFromBaseAsset(assetId) }}
             side="right"
           >
             {stringGetter({ key: STRING_KEYS.AMOUNT })}
           </WithTooltip>
-          {id && <DisplayUnitTag assetId={id} entryPoint="tradeAmountInputAssetTag" />}
+          {assetId && <DisplayUnitTag assetId={assetId} entryPoint="tradeAmountInputAssetTag" />}
         </>
       }
       slotRight={inputToggleButton()}
@@ -239,6 +256,8 @@ export const TradeSizeInputs = () => {
           }
         />
       )}
+      {needsTargetLeverage && <TargetLeverageInput />}
+
       {needsBalancePercent && (
         <TradePercentSizeToggle
           balancePercentValue={balancePercentInput}
@@ -265,4 +284,4 @@ const $ToggleButton = styled(ToggleButton)`
   }
 `;
 
-const $Tooltip = tw.div`inline-flex`;
+const $Conversion = tw.div`inline-flex`;

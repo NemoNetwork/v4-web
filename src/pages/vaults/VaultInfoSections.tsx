@@ -1,5 +1,6 @@
 import React from 'react';
 
+import BigNumber from 'bignumber.js';
 import { useNavigate } from 'react-router-dom';
 import styled, { css } from 'styled-components';
 
@@ -8,7 +9,9 @@ import { NumberSign } from '@/constants/numbers';
 import { AppRoute } from '@/constants/routes';
 
 import { useBreakpoints } from '@/hooks/useBreakpoints';
+import { useEnvConfig } from '@/hooks/useEnvConfig';
 import { useStringGetter } from '@/hooks/useStringGetter';
+import { useURLConfigs } from '@/hooks/useURLConfigs';
 import {
   useLoadedVaultAccount,
   useLoadedVaultDetails,
@@ -19,10 +22,12 @@ import breakpoints from '@/styles/breakpoints';
 import { layoutMixins } from '@/styles/layoutMixins';
 
 import { BackButton } from '@/components/BackButton';
+import { Link } from '@/components/Link';
 import { Output, OutputType } from '@/components/Output';
 import { VerticalSeparator } from '@/components/Separator';
 import { Tag, TagSize, TagType } from '@/components/Tag';
 import { WithTooltip } from '@/components/WithTooltip';
+import { MegaVaultYieldOutput } from '@/views/MegaVaultYieldOutput';
 
 import { getNumberSign } from '@/lib/numbers';
 import { orEmptyObj } from '@/lib/typeUtils';
@@ -42,7 +47,11 @@ export const YourVaultDetailsCards = ({ className }: { className?: string }) => 
         myVaultMetadata == null || myVaultMetadata.balanceUsdc === 0 ? (
           <EmptyValue />
         ) : (
-          <Output value={myVaultMetadata?.balanceUsdc} type={OutputType.Fiat} />
+          <Output
+            value={myVaultMetadata.balanceUsdc}
+            roundingMode={BigNumber.ROUND_FLOOR}
+            type={OutputType.Fiat}
+          />
         ),
     },
     {
@@ -51,17 +60,13 @@ export const YourVaultDetailsCards = ({ className }: { className?: string }) => 
       tooltip: 'vault-all-time-pnl' as const,
       value:
         myVaultMetadata == null ||
-        myVaultMetadata?.allTimeReturnUsdc == null ||
-        myVaultMetadata?.allTimeReturnUsdc === 0 ? (
+        myVaultMetadata.allTimeReturnUsdc == null ||
+        myVaultMetadata.allTimeReturnUsdc === 0 ? (
           <EmptyValue />
         ) : (
-          <$ColoredReturn $sign={getNumberSign(myVaultMetadata?.allTimeReturnUsdc, 0.01)}>
+          <$ColoredReturn $sign={getNumberSign(myVaultMetadata.allTimeReturnUsdc, 0.01)}>
             <div tw="row gap-0.5">
-              <Output
-                value={myVaultMetadata?.allTimeReturnUsdc}
-                type={OutputType.Fiat}
-                fractionDigits={0}
-              />
+              <Output value={myVaultMetadata.allTimeReturnUsdc} type={OutputType.Fiat} />
             </div>
           </$ColoredReturn>
         ),
@@ -96,23 +101,62 @@ const $DetailCard = styled.div`
 `;
 export const VaultDescription = ({ className }: { className?: string }) => {
   const stringGetter = useStringGetter();
+  const { vaultOperatorLearnMore, vaultLearnMore } = useURLConfigs();
+  const operatorName = useEnvConfig('megavaultOperatorName');
   return (
-    <div className={className} tw="text-color-text-0 font-small-medium">
-      {stringGetter({ key: STRING_KEYS.VAULT_DESCRIPTION })}
+    <div className={className} tw="flex flex-col gap-0.5 text-color-text-0 font-small-medium">
+      <p>
+        {stringGetter({
+          key: STRING_KEYS.VAULT_DESCRIPTION,
+        })}{' '}
+        {vaultLearnMore && (
+          <Link isInline withIcon href={vaultLearnMore}>
+            {stringGetter({ key: STRING_KEYS.LEARN_MORE_ABOUT_MEGAVAULT })}
+          </Link>
+        )}
+      </p>
+      {operatorName.length > 0 && (
+        <p>
+          {stringGetter({
+            key: STRING_KEYS.VAULT_OPERATOR_DESCRIPTION,
+            params: {
+              OPERATOR_NAME: operatorName,
+            },
+          })}{' '}
+          {vaultOperatorLearnMore && (
+            <Link isInline withIcon href={vaultOperatorLearnMore}>
+              {stringGetter({
+                key: STRING_KEYS.LEARN_MORE_ABOUT_OPERATOR,
+                params: {
+                  OPERATOR_NAME: operatorName,
+                },
+              })}
+            </Link>
+          )}
+        </p>
+      )}
     </div>
   );
 };
 export const VaultPositionsSection = ({ className }: { className?: string }) => {
   const stringGetter = useStringGetter();
-  const numPositions = useLoadedVaultPositions()?.positions?.size;
+  const numPositions = useLoadedVaultPositions()?.positions?.length;
+  const { vaultMetrics } = useURLConfigs();
 
   return (
     <div className={className}>
-      <div tw="row mb-1 gap-0.5 text-color-text-2 font-large-medium">
-        {stringGetter({ key: STRING_KEYS.POSITIONS })}{' '}
-        <Tag size={TagSize.Medium} type={TagType.Number}>
-          {numPositions}
-        </Tag>
+      <div tw="row mb-1 justify-between">
+        <div tw="row gap-0.5 text-color-text-2 font-large-medium">
+          {stringGetter({ key: STRING_KEYS.HOLDINGS })}{' '}
+          <Tag size={TagSize.Medium} type={TagType.Number}>
+            {numPositions}
+          </Tag>
+        </div>
+        {vaultMetrics && (
+          <Link isInline withIcon href={vaultMetrics}>
+            {stringGetter({ key: STRING_KEYS.METRICS })}
+          </Link>
+        )}
       </div>
       <VaultPositionsTable />
     </div>
@@ -123,17 +167,14 @@ export const VaultHeader = ({ className }: { className?: string }) => {
   const { isTablet } = useBreakpoints();
   const navigate = useNavigate();
 
-  const { thirtyDayReturnPercent, totalValue } = orEmptyObj(useLoadedVaultDetails().data);
+  const { totalValue } = orEmptyObj(useLoadedVaultDetails().data);
 
   const detailItems = [
     {
       key: '30d-apr',
-      label: stringGetter({ key: STRING_KEYS.VAULT_THIRTY_DAY_APR }),
-      value: (
-        <$ColoredReturn $sign={getNumberSign(thirtyDayReturnPercent)}>
-          <Output value={thirtyDayReturnPercent} type={OutputType.Percent} />
-        </$ColoredReturn>
-      ),
+      label: stringGetter({ key: STRING_KEYS.EST_APR_PLAIN }),
+      tooltip: 'vault-apr' as const,
+      value: <MegaVaultYieldOutput />,
     },
     {
       key: 'balance',
@@ -162,7 +203,9 @@ export const VaultHeader = ({ className }: { className?: string }) => {
           <React.Fragment key={item.key}>
             <$VerticalSeparator />
             <div key={item.key} tw="flexColumn gap-0.375 px-0.5 py-0.25 font-base-book">
-              <div tw="text-color-text-0">{item.label}</div>
+              <WithTooltip tooltip={item.tooltip} side="bottom">
+                <div tw="text-color-text-0">{item.label}</div>
+              </WithTooltip>
               <$DetailValue>{item.value}</$DetailValue>
             </div>
           </React.Fragment>

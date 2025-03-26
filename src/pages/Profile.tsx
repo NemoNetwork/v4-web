@@ -1,3 +1,4 @@
+import { BonsaiHooks } from '@/bonsai/ontology';
 import { Link as ReactLink, useNavigate } from 'react-router-dom';
 import styled, { css } from 'styled-components';
 import tw from 'twin.macro';
@@ -30,10 +31,7 @@ import { Panel } from '@/components/Panel';
 import { Toolbar } from '@/components/Toolbar';
 import { FillsTable, FillsTableColumnKey } from '@/views/tables/FillsTable';
 
-import {
-  getHistoricalTradingRewardsForCurrentWeek,
-  getOnboardingState,
-} from '@/state/accountSelectors';
+import { getOnboardingState } from '@/state/accountSelectors';
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
 import { openDialog } from '@/state/dialogs';
 
@@ -43,7 +41,6 @@ import { truncateAddress } from '@/lib/wallet';
 import { GovernancePanel } from './token/GovernancePanel';
 import { LaunchIncentivesPanel } from './token/LaunchIncentivesPanel';
 import { MigratePanel } from './token/MigratePanel';
-import { NewMarketsPanel } from './token/NewMarketsPanel';
 import { StakingPanel } from './token/StakingPanel';
 
 const ENS_CHAIN_ID = 1; // Ethereum
@@ -68,8 +65,9 @@ const Profile = () => {
   const isConnected = onboardingState !== OnboardingState.Disconnected;
 
   const { sourceAccount, dydxAddress } = useAccounts();
-  const { chainTokenLabel } = useTokenConfigs();
+  const { chainTokenImage, chainTokenLabel } = useTokenConfigs();
   const { disableConnectButton } = useComplianceState();
+  const currentWeekTradingReward = BonsaiHooks.useHistoricalTradingRewardsWeekly().data;
 
   const { data: ensName } = useEnsName({
     address:
@@ -78,8 +76,6 @@ const Profile = () => {
         : undefined,
     chainId: ENS_CHAIN_ID,
   });
-
-  const currentWeekTradingReward = useAppSelector(getHistoricalTradingRewardsForCurrentWeek);
 
   const actions: Action[] = [
     {
@@ -159,7 +155,9 @@ const Profile = () => {
               <span>
                 {sourceAccount.walletInfo.connectorType === ConnectorType.Injected
                   ? sourceAccount.walletInfo.name
-                  : stringGetter({ key: wallets[sourceAccount.walletInfo.name].stringKey })}
+                  : stringGetter({
+                      key: wallets[sourceAccount.walletInfo.name as keyof typeof wallets].stringKey,
+                    })}
               </span>
             </$SubHeader>
           ) : (
@@ -223,9 +221,11 @@ const Profile = () => {
               label: stringGetter({ key: STRING_KEYS.THIS_WEEK }),
               value: (
                 <Output
-                  slotRight={<AssetIcon symbol={chainTokenLabel} tw="ml-[0.5ch]" />}
+                  slotRight={
+                    <AssetIcon logoUrl={chainTokenImage} symbol={chainTokenLabel} tw="ml-[0.5ch]" />
+                  }
                   type={OutputType.Asset}
-                  value={currentWeekTradingReward?.amount}
+                  value={currentWeekTradingReward}
                 />
               ),
             },
@@ -256,10 +256,10 @@ const Profile = () => {
       >
         <FillsTable
           columnKeys={[
+            FillsTableColumnKey.Time,
             FillsTableColumnKey.Action,
-            FillsTableColumnKey.SideLongShort,
             FillsTableColumnKey.Type,
-            FillsTableColumnKey.AmountTag,
+            FillsTableColumnKey.Total,
           ]}
           withInnerBorders={false}
           initialPageSize={5}
@@ -280,7 +280,6 @@ const Profile = () => {
         })}
       </Panel>
       <GovernancePanel tw="[grid-area:governance]" />
-      <NewMarketsPanel tw="[grid-area:newMarkets]" />
     </$MobileProfileLayout>
   );
 };
@@ -304,7 +303,7 @@ const $MobileProfileLayout = styled.div`
     'staking staking'
     'rewards fees'
     'history history'
-    'governance newMarkets'
+    'governance governance'
     'incentives incentives'
     'legal legal';
 
@@ -318,7 +317,6 @@ const $MobileProfileLayout = styled.div`
       'rewards fees'
       'history history'
       'governance governance'
-      'newMarkets newMarkets'
       'incentives incentives'
       'legal legal';
   }

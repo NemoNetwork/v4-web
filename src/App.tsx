@@ -1,15 +1,18 @@
 import { lazy, Suspense, useEffect, useMemo } from 'react';
 
 import isPropValid from '@emotion/is-prop-valid';
+import { FunkitProvider } from '@funkit/connect';
+import '@funkit/connect/styles.css';
 import { PrivyProvider } from '@privy-io/react-auth';
 import { WagmiProvider } from '@privy-io/wagmi';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { GrazProvider } from 'graz';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { PersistGate } from 'redux-persist/integration/react';
 import styled, { css, StyleSheetManager, WebTarget } from 'styled-components';
 
 import { config as grazConfig } from '@/constants/graz';
-import { AppRoute, DEFAULT_TRADE_ROUTE, MarketsRoute } from '@/constants/routes';
+import { AppRoute, DEFAULT_TRADE_ROUTE } from '@/constants/routes';
 
 import { AccountsProvider } from '@/hooks/useAccounts';
 import { AppThemeAndColorModeProvider } from '@/hooks/useAppThemeAndColorMode';
@@ -18,7 +21,6 @@ import { DydxProvider } from '@/hooks/useDydxClient';
 import { LocalNotificationsProvider } from '@/hooks/useLocalNotifications';
 import { LocaleProvider } from '@/hooks/useLocaleSeparators';
 import { NotificationsProvider } from '@/hooks/useNotifications';
-import { PotentialMarketsProvider } from '@/hooks/usePotentialMarkets';
 import { RestrictionProvider } from '@/hooks/useRestrictions';
 import { StatsigProvider } from '@/hooks/useStatsig';
 import { SubaccountProvider } from '@/hooks/useSubaccount';
@@ -41,23 +43,28 @@ import { parseLocationHash } from '@/lib/urlUtils';
 import { config, privyConfig } from '@/lib/wagmi';
 
 import { RestrictionWarning } from './components/RestrictionWarning';
-import { ComplianceStates } from './constants/compliance';
-import { DialogTypes } from './constants/dialogs';
+import { funkitConfig, funkitTheme } from './constants/funkit';
+import { LocalStorageKey } from './constants/localStorage';
+import { SkipProvider } from './hooks/transfers/skipClient';
 import { useAnalytics } from './hooks/useAnalytics';
 import { useBreakpoints } from './hooks/useBreakpoints';
 import { useCommandMenu } from './hooks/useCommandMenu';
 import { useComplianceState } from './hooks/useComplianceState';
 import { useInitializePage } from './hooks/useInitializePage';
+import { useLocalStorage } from './hooks/useLocalStorage';
+import { useReferralCode } from './hooks/useReferralCode';
 import { useShouldShowFooter } from './hooks/useShouldShowFooter';
 import { useTokenConfigs } from './hooks/useTokenConfigs';
-import { testFlags } from './lib/testFlags';
-import LaunchMarket from './pages/LaunchMarket';
+import { useUpdateTransfers } from './hooks/useUpdateTransfers';
+import { isTruthy } from './lib/isTruthy';
+import { AffiliatesPage } from './pages/affiliates/AffiliatesPage';
+import { persistor } from './state/_store';
 import { appQueryClient } from './state/appQueryClient';
-import { useAppDispatch } from './state/appTypes';
-import { openDialog } from './state/dialogs';
+import { useAppDispatch, useAppSelector } from './state/appTypes';
+import { AppTheme, setAppThemeSetting } from './state/appUiConfigs';
+import { getAppThemeSetting } from './state/appUiConfigsSelectors';
 import breakpoints from './styles/breakpoints';
 
-const NewMarket = lazy(() => import('@/pages/markets/NewMarket'));
 const MarketsPage = lazy(() => import('@/pages/markets/Markets'));
 const PortfolioPage = lazy(() => import('@/pages/portfolio/Portfolio'));
 const AlertsPage = lazy(() => import('@/pages/AlertsPage'));
@@ -73,8 +80,10 @@ const Content = () => {
   useInitializePage();
   useAnalytics();
   useCommandMenu();
+  useUpdateTransfers();
+  useReferralCode();
+  useUiRefreshMigrations();
 
-  const dispatch = useAppDispatch();
   const { isTablet, isNotTablet } = useBreakpoints();
   const { chainTokenLabel } = useTokenConfigs();
 
@@ -82,8 +91,7 @@ const Content = () => {
   const isShowingHeader = isNotTablet;
   const isShowingFooter = useShouldShowFooter();
 
-  const { complianceState } = useComplianceState();
-  const showRestrictionWarning = complianceState === ComplianceStates.READ_ONLY;
+  const { showRestrictionWarning } = useComplianceState();
 
   const pathFromHash = useMemo(() => {
     if (location.hash === '') {
@@ -94,12 +102,6 @@ const Content = () => {
 
   const { dialogAreaRef } = useDialogArea() ?? {};
 
-  useEffect(() => {
-    if (testFlags.referralCode) {
-      dispatch(openDialog(DialogTypes.Referral({ refCode: testFlags.referralCode })));
-    }
-  }, [dispatch]);
-
   return (
     <>
       <GlobalStyle />
@@ -108,25 +110,19 @@ const Content = () => {
         isShowingFooter={isShowingFooter}
         showRestrictionWarning={showRestrictionWarning}
       >
-        {isNotTablet && <HeaderDesktop />}
+        {isShowingHeader && <HeaderDesktop />}
         {showRestrictionWarning && <RestrictionWarning />}
         <$Main>
           <Suspense fallback={<LoadingSpace id="main" />}>
             <Routes>
+              <Route path={`${AppRoute.Referrals}/*`} element={<AffiliatesPage />} />
+
               <Route path={AppRoute.Trade}>
                 <Route path=":market" element={<TradePage />} />
                 <Route path={AppRoute.Trade} element={<TradePage />} />
               </Route>
 
               <Route path={AppRoute.Markets}>
-                {testFlags.pml ? (
-                  <Route
-                    path={MarketsRoute.New}
-                    element={<Navigate to={AppRoute.LaunchMarket} replace />}
-                  />
-                ) : (
-                  <Route path={MarketsRoute.New} element={<NewMarket />} />
-                )}
                 <Route path={AppRoute.Markets} element={<MarketsPage />} />
               </Route>
 
@@ -147,8 +143,6 @@ const Content = () => {
               <Route path={AppRoute.Vault}>
                 <Route path={AppRoute.Vault} element={<VaultPage />} />
               </Route>
-
-              {testFlags.pml && <Route path={AppRoute.LaunchMarket} element={<LaunchMarket />} />}
               <Route path={AppRoute.Terms} element={<TermsOfUsePage />} />
               <Route path={AppRoute.Privacy} element={<PrivacyPolicyPage />} />
               <Route
@@ -171,6 +165,23 @@ const Content = () => {
   );
 };
 
+function useUiRefreshMigrations() {
+  const themeSetting = useAppSelector(getAppThemeSetting);
+  const dispatch = useAppDispatch();
+  const [seenUiRefresh, setSeenUiRefresh] = useLocalStorage({
+    key: LocalStorageKey.HasSeenUiRefresh,
+    defaultValue: false,
+  });
+  useEffect(() => {
+    if (!seenUiRefresh) {
+      setSeenUiRefresh(true);
+      if (themeSetting === AppTheme.Classic) {
+        dispatch(setAppThemeSetting(AppTheme.Dark));
+      }
+    }
+  }, [themeSetting, seenUiRefresh, dispatch, setSeenUiRefresh]);
+}
+
 const wrapProvider = (Component: React.ComponentType<any>, props?: any) => {
   // eslint-disable-next-line react/display-name
   return ({ children }: { children: React.ReactNode }) => (
@@ -189,22 +200,34 @@ const providers = [
   wrapProvider(GrazProvider, { grazOptions: grazConfig }),
   wrapProvider(WagmiProvider, { config, reconnectOnMount: false }),
   wrapProvider(LocaleProvider),
+  import.meta.env.VITE_FUNKIT_API_KEY &&
+    wrapProvider(FunkitProvider, {
+      funkitConfig: funkitConfig(),
+      theme: funkitTheme,
+      initialChain: config.chains[0].id,
+    }),
   wrapProvider(RestrictionProvider),
   wrapProvider(DydxProvider),
   wrapProvider(AccountsProvider),
   wrapProvider(SubaccountProvider),
+  wrapProvider(SkipProvider),
   wrapProvider(LocalNotificationsProvider),
   wrapProvider(NotificationsProvider),
   wrapProvider(DialogAreaProvider),
-  wrapProvider(PotentialMarketsProvider),
   wrapProvider(StyleSheetManager, { shouldForwardProp }),
   wrapProvider(AppThemeAndColorModeProvider),
-];
+].filter(isTruthy);
 
 const App = () => {
   return [...providers].reverse().reduce(
     (children, Provider) => {
-      return <Provider>{children}</Provider>;
+      return (
+        <Provider>
+          <PersistGate loading={<LoadingSpace id="main" />} persistor={persistor}>
+            {children}
+          </PersistGate>
+        </Provider>
+      );
     },
     <Content />
   );
@@ -228,6 +251,7 @@ const $Content = styled.div<{
   /* Computed */
   --page-currentHeaderHeight: 0px;
   --page-currentFooterHeight: 0px;
+  --restriction-warning-currentHeight: 0px;
 
   ${({ isShowingHeader }) =>
     isShowingHeader &&
@@ -248,10 +272,20 @@ const $Content = styled.div<{
         --page-currentFooterHeight: var(--page-footer-height-mobile);
       }
     `}
-  
+
+  ${({ showRestrictionWarning }) =>
+    showRestrictionWarning &&
+    css`
+      --restriction-warning-currentHeight: var(--restriction-warning-height);
+
+      @media ${breakpoints.tablet} {
+        --restriction-warning-currentHeight: var(--restriction-warning-height-mobile);
+      }
+    `}
+
     /* Rules */
     ${layoutMixins.contentContainer}
-  
+
     ${layoutMixins.scrollArea}
     --scrollArea-height: 100vh;
 
@@ -267,10 +301,13 @@ const $Content = styled.div<{
 
   ${layoutMixins.withOuterAndInnerBorders}
   display: grid;
-  ${({ showRestrictionWarning }) => css`
+
+  ${({ showRestrictionWarning, isShowingHeader }) => css`
     grid-template:
-      'Header' var(--page-currentHeaderHeight)
-      ${showRestrictionWarning ? css`'RestrictionWarning' min-content` : ''}
+      ${isShowingHeader ? css`'Header' var(--page-currentHeaderHeight)` : ''}
+      ${showRestrictionWarning
+        ? css`'RestrictionWarning' var(--restriction-warning-currentHeight)`
+        : ''}
       'Main' minmax(min-content, 1fr)
       'Footer' var(--page-currentFooterHeight)
       / 100%;

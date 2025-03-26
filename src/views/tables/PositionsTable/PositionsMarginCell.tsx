@@ -1,9 +1,7 @@
-import { useMemo } from 'react';
-
+import { SubaccountPosition } from '@/bonsai/types/summaryTypes';
 import styled from 'styled-components';
 
-import { AbacusMarginMode, type SubaccountPosition } from '@/constants/abacus';
-import { ButtonShape } from '@/constants/buttons';
+import { ButtonShape, ButtonSize } from '@/constants/buttons';
 import { DialogTypes } from '@/constants/dialogs';
 import { STRING_KEYS } from '@/constants/localization';
 
@@ -18,8 +16,6 @@ import { WithTooltip } from '@/components/WithTooltip';
 import { useAppDispatch } from '@/state/appTypes';
 import { openDialog } from '@/state/dialogs';
 
-import { getMarginModeFromSubaccountNumber, getPositionMargin } from '@/lib/tradeData';
-
 type PositionsMarginCellProps = {
   position: SubaccountPosition;
 };
@@ -28,48 +24,36 @@ export const PositionsMarginCell = ({ position }: PositionsMarginCellProps) => {
   const stringGetter = useStringGetter();
   const dispatch = useAppDispatch();
 
-  const { marginMode, marginModeLabel, margin } = useMemo(() => {
-    const { childSubaccountNumber } = position;
-    const derivedMarginMode = getMarginModeFromSubaccountNumber(childSubaccountNumber);
-
-    return {
-      marginMode: derivedMarginMode,
-      marginModeLabel:
-        derivedMarginMode === AbacusMarginMode.Cross
-          ? stringGetter({ key: STRING_KEYS.CROSS })
-          : stringGetter({ key: STRING_KEYS.ISOLATED }),
-      margin: getPositionMargin({ position }),
-    };
-  }, [position, stringGetter]);
-
   return (
     <TableCell
-      stacked
       slotRight={
-        marginMode === AbacusMarginMode.Isolated && (
+        position.marginMode === 'ISOLATED' && (
           <WithTooltip tooltipString={stringGetter({ key: STRING_KEYS.ADJUST_ISOLATED_MARGIN })}>
             <$EditButton
               key="edit-margin"
               iconName={IconName.Pencil}
               shape={ButtonShape.Square}
+              size={ButtonSize.XSmall}
               onClick={() =>
-                dispatch(openDialog(DialogTypes.AdjustIsolatedMargin({ positionId: position.id })))
+                // todo this handoff should be using uniqueid
+                dispatch(
+                  openDialog(DialogTypes.AdjustIsolatedMargin({ positionId: position.uniqueId }))
+                )
               }
             />
           </WithTooltip>
         )
       }
     >
-      <Output type={OutputType.Fiat} value={margin} showSign={ShowSign.None} />
-      <span>{marginModeLabel}</span>
+      <Output type={OutputType.Fiat} value={position.marginValueInitial} showSign={ShowSign.None} />
     </TableCell>
   );
 };
+
 const $EditButton = styled(IconButton)`
-  --button-icon-size: 1.5em;
-  --button-padding: 0;
   --button-textColor: var(--color-text-0);
   --button-hover-textColor: var(--color-text-1);
-
-  margin-left: 0.5rem;
+  --button-backgroundColor: transparent;
+  --button-border: none;
+  --button-width: min-content;
 `;

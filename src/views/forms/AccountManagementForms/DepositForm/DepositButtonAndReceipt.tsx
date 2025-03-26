@@ -1,5 +1,6 @@
 import { useState, type Dispatch, type SetStateAction } from 'react';
 
+import { BonsaiCore } from '@/bonsai/ontology';
 import { shallowEqual } from 'react-redux';
 import styled from 'styled-components';
 
@@ -26,12 +27,12 @@ import { WithTooltip } from '@/components/WithTooltip';
 import { OnboardingTriggerButton } from '@/views/dialogs/OnboardingTriggerButton';
 
 import { calculateCanAccountTrade } from '@/state/accountCalculators';
-import { getSubaccountBuyingPower, getSubaccountEquity } from '@/state/accountSelectors';
+import { getSubaccountForPostOrder } from '@/state/accountSelectors';
 import { useAppSelector } from '@/state/appTypes';
 import { getTransferInputs } from '@/state/inputsSelectors';
 
 import { isTruthy } from '@/lib/isTruthy';
-import { MustBigNumber } from '@/lib/numbers';
+import { orEmptyObj } from '@/lib/typeUtils';
 
 import { RouteWarningMessage } from '../RouteWarningMessage';
 import { SlippageEditor } from '../SlippageEditor';
@@ -92,11 +93,8 @@ export const DepositButtonAndReceipt = ({
     },
   });
 
-  const { current: equity, postOrder: newEquity } =
-    useAppSelector(getSubaccountEquity, shallowEqual) ?? {};
-
-  const { current: buyingPower, postOrder: newBuyingPower } =
-    useAppSelector(getSubaccountBuyingPower, shallowEqual) ?? {};
+  const { equity } = orEmptyObj(useAppSelector(BonsaiCore.account.parentSubaccountSummary.data));
+  const { equity: newEquity } = orEmptyObj(useAppSelector(getSubaccountForPostOrder));
 
   const {
     summary,
@@ -141,7 +139,7 @@ export const DepositButtonAndReceipt = ({
           <Output
             type={OutputType.Fiat}
             fractionDigits={TOKEN_DECIMALS}
-            value={summary?.toAmountMin}
+            value={summary.toAmountMin}
           />
         ),
         tooltip: 'minimum-deposit-amount',
@@ -158,7 +156,7 @@ export const DepositButtonAndReceipt = ({
               tag={sourceToken?.symbol}
             />
             =
-            <Output type={OutputType.Asset} value={summary?.exchangeRate} tag={usdcLabel} />
+            <Output type={OutputType.Asset} value={summary.exchangeRate} tag={usdcLabel} />
           </span>
         ),
       },
@@ -169,7 +167,7 @@ export const DepositButtonAndReceipt = ({
             {stringGetter({ key: STRING_KEYS.GAS_FEE })}
           </WithTooltip>
         ),
-        value: <Output type={OutputType.Fiat} value={summary?.gasFee} />,
+        value: <Output type={OutputType.Fiat} value={summary.gasFee} />,
       },
       typeof summary?.bridgeFee === 'number' && {
         key: 'bridge-fees',
@@ -178,7 +176,7 @@ export const DepositButtonAndReceipt = ({
             {stringGetter({ key: STRING_KEYS.BRIDGE_FEE })}
           </WithTooltip>
         ),
-        value: <Output type={OutputType.Fiat} value={summary?.bridgeFee} />,
+        value: <Output type={OutputType.Fiat} value={summary.bridgeFee} />,
       },
       {
         key: 'equity',
@@ -191,26 +189,9 @@ export const DepositButtonAndReceipt = ({
           <DiffOutput
             type={OutputType.Fiat}
             value={equity}
-            newValue={newEquity} // using toAmountUSD as a proxy for equity until Abacus supports accounts with no funds.
+            newValue={newEquity?.postOrder} // using toAmountUSD as a proxy for equity until Abacus supports accounts with no funds.
             sign={NumberSign.Positive}
             withDiff={equity !== newEquity && !!newEquity}
-          />
-        ),
-      },
-      {
-        key: 'buying-power',
-        label: (
-          <span>
-            {stringGetter({ key: STRING_KEYS.BUYING_POWER })} <Tag>{usdcLabel}</Tag>
-          </span>
-        ),
-        value: (
-          <DiffOutput
-            type={OutputType.Fiat}
-            value={MustBigNumber(buyingPower).lt(0) ? undefined : buyingPower}
-            newValue={newBuyingPower}
-            sign={NumberSign.Positive}
-            withDiff={Boolean(newBuyingPower) && buyingPower !== newBuyingPower}
           />
         ),
       },

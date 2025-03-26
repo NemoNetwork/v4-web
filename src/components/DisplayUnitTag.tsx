@@ -7,8 +7,10 @@ import { NORMAL_DEBOUNCE_MS } from '@/constants/debounce';
 import { DisplayUnit } from '@/constants/trade';
 
 import { useAppSelector } from '@/state/appTypes';
-import { setDisplayUnit } from '@/state/configs';
-import { getSelectedDisplayUnit } from '@/state/configsSelectors';
+import { setDisplayUnit } from '@/state/appUiConfigs';
+import { getSelectedDisplayUnit } from '@/state/appUiConfigsSelectors';
+
+import { getDisplayableAssetFromBaseAsset } from '@/lib/assetUtils';
 
 import { Tag } from './Tag';
 
@@ -40,7 +42,7 @@ export const DisplayUnitTag = ({ entryPoint, assetId, className }: ElementProps)
     <Tag onClick={onToggle} tw="cursor-pointer" className={className}>
       {
         {
-          [DisplayUnit.Asset]: assetId,
+          [DisplayUnit.Asset]: getDisplayableAssetFromBaseAsset(assetId),
           [DisplayUnit.Fiat]: 'USD',
         }[displayUnit]
       }

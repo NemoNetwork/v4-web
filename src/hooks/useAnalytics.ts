@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { shallowEqual } from 'react-redux';
 import { useLocation } from 'react-router-dom';
@@ -12,7 +12,8 @@ import { DialogTypesTypes } from '@/constants/dialogs';
 import { WalletInfo } from '@/constants/wallets';
 
 import { calculateOnboardingStep } from '@/state/accountCalculators';
-import { getGeo, getOnboardingState, getSubaccountId } from '@/state/accountSelectors';
+import { getSubaccountId } from '@/state/accountInfoSelectors';
+import { getGeo, getOnboardingState } from '@/state/accountSelectors';
 import { useAppSelector } from '@/state/appTypes';
 import { getActiveDialog } from '@/state/dialogsSelectors';
 import { getInputTradeData } from '@/state/inputsSelectors';
@@ -25,11 +26,12 @@ import { useAccounts } from './useAccounts';
 import { useApiState } from './useApiState';
 import { useBreakpoints } from './useBreakpoints';
 import { useDydxClient } from './useDydxClient';
+import { useReferredBy } from './useReferredBy';
 import { useSelectedNetwork } from './useSelectedNetwork';
 import { useAllStatsigGateValues } from './useStatsig';
 
 export const useAnalytics = () => {
-  const latestTag = import.meta.env.VITE_LAST_TAG;
+  const latestCommit = import.meta.env.VITE_LAST_ORIGINAL_COMMIT;
   const { sourceAccount, selectedWallet, dydxAddress } = useAccounts();
   const { indexerClient } = useDydxClient();
   const statsigConfig = useAllStatsigGateValues();
@@ -73,10 +75,10 @@ export const useAnalytics = () => {
 
   // AnalyticsUserProperty.Version
   useEffect(() => {
-    if (latestTag !== undefined) {
-      identify(AnalyticsUserProperties.Version(latestTag.split(`release/v`).at(-1)));
+    if (latestCommit !== undefined) {
+      identify(AnalyticsUserProperties.Version(latestCommit));
     }
-  }, [latestTag]);
+  }, [latestCommit]);
 
   // AnalyticsUserProperty.StatsigConfigs
   useEffect(() => {
@@ -112,6 +114,14 @@ export const useAnalytics = () => {
     identify(AnalyticsUserProperties.DydxAddress(dydxAddress ?? null));
   }, [dydxAddress]);
 
+  useEffect(() => {
+    identify(
+      AnalyticsUserProperties.IsRememberMe(
+        dydxAddress ? Boolean(sourceAccount.encryptedSignature) : null
+      )
+    );
+  }, [dydxAddress, sourceAccount.encryptedSignature]);
+
   // AnalyticsUserProperty.SubaccountNumber
   const subaccountNumber = useAppSelector(getSubaccountId);
   useEffect(() => {
@@ -134,12 +144,13 @@ export const useAnalytics = () => {
 
       const lastSuccessfulIndexerRpcQuery =
         (websocketEndpoint &&
+          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
           lastSuccessfulWebsocketRequestByOrigin[new URL(websocketEndpoint).origin]) ||
         undefined;
 
       track(
         AnalyticsEvents.NetworkStatus({
-          status: status.name,
+          status,
           lastSuccessfulIndexerRpcQuery,
           elapsedTime: lastSuccessfulIndexerRpcQuery && Date.now() - lastSuccessfulIndexerRpcQuery,
           blockHeight: height ?? undefined,
@@ -149,22 +160,23 @@ export const useAnalytics = () => {
       );
     }
   }, [status]);
-
   // AnalyticsEvent.NavigatePage
   const location = useLocation();
-
+  const previousPathRef = useRef(location.pathname);
   useEffect(() => {
     // Ignore hashchange events from <iframe>s x_x
-    if (location.pathname.startsWith('/'))
-      track(AnalyticsEvents.NavigatePage({ path: location.pathname }));
+    if (location.pathname.startsWith('/')) {
+      const previousPath = previousPathRef.current;
+      track(AnalyticsEvents.NavigatePage({ path: location.pathname, previousPath }));
+      previousPathRef.current = location.pathname;
+    }
   }, [location]);
 
   // AnalyticsEvent.NavigateDialog
   // AnalyticsEvent.NavigateDialogClose
   const activeDialog = useAppSelector(getActiveDialog);
-  const [previousActiveDialogType, setPreviousActiveDialogType] = useState<
-    DialogTypesTypes | undefined
-  >();
+  const previousActiveDialogTypeRef = useRef<DialogTypesTypes | undefined>(undefined);
+  const previousActiveDialogType = previousActiveDialogTypeRef.current;
 
   useEffect(
     () => {
@@ -181,7 +193,7 @@ export const useAnalytics = () => {
         track(AnalyticsEvents.NavigateDialogClose({ type: previousActiveDialogType }));
       }
 
-      setPreviousActiveDialogType(activeDialog?.type);
+      previousActiveDialogTypeRef.current = activeDialog?.type;
     },
     // This effect should only trigger on updates to the current active dialog, not previousActiveDialogType
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -231,8 +243,8 @@ export const useAnalytics = () => {
     if (selectedWallet) {
       track(
         AnalyticsEvents.ConnectWallet({
-          walletType: selectedWallet?.name,
-          walletConnectorType: selectedWallet?.connectorType!,
+          walletType: selectedWallet.name,
+          walletConnectorType: selectedWallet.connectorType!,
         })
       );
     } else if (previousSelectedWallet) {
@@ -258,4 +270,12 @@ export const useAnalytics = () => {
       setHasSelectedOrderTypeChanged(true);
     }
   }, [selectedOrderType]);
+
+  const { data: referredBy, isFetched: isReferredByFetched } = useReferredBy();
+
+  useEffect(() => {
+    if (isReferredByFetched && referredBy) {
+      identify(AnalyticsUserProperties.AffiliateAddress(referredBy.affiliateAddress ?? null));
+    }
+  }, [isReferredByFetched, referredBy]);
 };

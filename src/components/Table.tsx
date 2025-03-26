@@ -34,9 +34,7 @@ import breakpoints from '@/styles/breakpoints';
 import { layoutMixins } from '@/styles/layoutMixins';
 
 import { MustBigNumber } from '@/lib/numbers';
-import { testFlags } from '@/lib/testFlags';
 
-import { Icon, IconName } from './Icon';
 import { SortIcon } from './SortIcon';
 import { PAGE_SIZES, PageSize, TablePaginationRow } from './Table/TablePaginationRow';
 import { Tag } from './Tag';
@@ -91,12 +89,14 @@ export type ColumnDef<TableRowData extends BaseTableRowData | CustomRowConfig> =
   isActionable?: boolean;
   hideOnBreakpoint?: MediaQueryKeys;
   width?: ColumnSize;
+  align?: 'start' | 'center' | 'end';
 } & (SortableColumnDef<TableRowData> | NonSortableColumnDef);
 
 export type TableElementProps<TableRowData extends BaseTableRowData | CustomRowConfig> = {
   label?: string;
   columns: ColumnDef<TableRowData>[];
   data: Array<TableRowData | CustomRowConfig>;
+  tableId: string;
   getRowKey: (rowData: TableRowData, rowIndex?: number) => Key;
   getRowAttributes?: (rowData: TableRowData, rowIndex?: number) => Record<string, any>;
   defaultSortDescriptor?: SortDescriptor;
@@ -107,6 +107,8 @@ export type TableElementProps<TableRowData extends BaseTableRowData | CustomRowC
   initialPageSize?: PageSize;
   paginationBehavior?: 'paginate' | 'showAll';
   firstClickSortDirection?: 'ascending' | 'descending';
+  shouldResetOnTotalRowsChange?: boolean;
+  getIsRowPinned?: (rowData: TableRowData) => boolean;
 };
 
 export type TableStyleProps = {
@@ -129,9 +131,11 @@ export type AllTableProps<TableRowData extends BaseTableRowData | CustomRowConfi
 export const Table = <TableRowData extends BaseTableRowData | CustomRowConfig>({
   label = '',
   columns,
+  tableId,
   data = [],
   getRowKey,
   getRowAttributes,
+  getIsRowPinned,
   onRowAction,
   defaultSortDescriptor,
   selectionMode = 'single',
@@ -147,6 +151,7 @@ export const Table = <TableRowData extends BaseTableRowData | CustomRowConfig>({
   withScrollSnapColumns = false,
   withScrollSnapRows = false,
   firstClickSortDirection = 'descending',
+  shouldResetOnTotalRowsChange = false,
   className,
   style,
 }: AllTableProps<TableRowData>) => {
@@ -155,6 +160,8 @@ export const Table = <TableRowData extends BaseTableRowData | CustomRowConfig>({
   const { currentPage, pageSize, pages, setCurrentPage, setPageSize } = useTablePagination({
     initialPageSize,
     totalRows: data.length,
+    shouldResetOnTotalRowsChange,
+    tableId,
   });
 
   const currentBreakpoints = useBreakpoints();
@@ -163,7 +170,6 @@ export const Table = <TableRowData extends BaseTableRowData | CustomRowConfig>({
   );
 
   const collator = useCollator();
-
   const sortFn = useCallback(
     (
       a: TableRowData | CustomRowConfig,
@@ -177,9 +183,18 @@ export const Table = <TableRowData extends BaseTableRowData | CustomRowConfig>({
       if (column == null || column.allowsSorting === false) {
         return 0;
       }
+
       const first = (isCustomRow(a) ? 0 : column.getCellValue(a)) ?? undefined;
       const second = (isCustomRow(b) ? 0 : column.getCellValue(b)) ?? undefined;
       const sortDirectionAsNumber = sortDirection === 'descending' ? -1 : 1;
+
+      // Pinned check: show items that are isPinned first
+      const isFirstPinned = isTableRowData(a) && getIsRowPinned?.(a);
+      const isSecondPinned = isTableRowData(b) && getIsRowPinned?.(b);
+
+      if (isFirstPinned !== isSecondPinned) {
+        return isFirstPinned ? -1 : 1;
+      }
 
       if (first == null || second == null) {
         if (first === second) {
@@ -214,10 +229,10 @@ export const Table = <TableRowData extends BaseTableRowData | CustomRowConfig>({
 
   const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>(defaultSortDescriptor ?? {});
   const items = useMemo(() => {
-    return sortDescriptor?.column
-      ? [...data].sort((a, b) => sortFn(a, b, sortDescriptor?.column, sortDescriptor?.direction))
+    return sortDescriptor.column
+      ? [...data].sort((a, b) => sortFn(a, b, sortDescriptor.column, sortDescriptor.direction))
       : data;
-  }, [data, sortDescriptor?.column, sortDescriptor?.direction, sortFn]);
+  }, [data, sortDescriptor.column, sortDescriptor.direction, sortFn]);
 
   const isEmpty = data.length === 0;
   const shouldPaginate = paginationBehavior === 'paginate' && data.length > Math.min(...PAGE_SIZES);
@@ -298,7 +313,7 @@ export const Table = <TableRowData extends BaseTableRowData | CustomRowConfig>({
                 {(columnKey) => (
                   <Cell key={`${internalGetRowKey(item)}-${columnKey}`}>
                     {isTableRowData(item) &&
-                      columns.find((column) => column.columnKey === columnKey)?.renderCell?.(item)}
+                      columns.find((column) => column.columnKey === columnKey)?.renderCell(item)}
                   </Cell>
                 )}
               </Row>
@@ -406,17 +421,14 @@ const TableRoot = <TableRowData extends BaseTableRowData | CustomRowConfig>(prop
             state={state}
             withScrollSnapRows={withScrollSnapRows}
           >
-            {[...headerRow.childNodes].map(
-              (column) => (
-                <TableColumnHeader
-                  key={column.key}
-                  column={column}
-                  state={state}
-                  withScrollSnapColumns={withScrollSnapColumns}
-                />
-              )
-              // )
-            )}
+            {[...headerRow.childNodes].map((column) => (
+              <TableColumnHeader
+                key={column.key}
+                column={column}
+                state={state}
+                withScrollSnapColumns={withScrollSnapColumns}
+              />
+            ))}
           </TableHeaderRow>
         ))}
       </TableHeadRowGroup>
@@ -427,7 +439,7 @@ const TableRoot = <TableRowData extends BaseTableRowData | CustomRowConfig>(prop
         withOuterBorder={withOuterBorder}
       >
         {[...collection.body.childNodes].map((row) =>
-          (row.value as CustomRowConfig)?.slotCustomRow ? (
+          (row.value as CustomRowConfig | null)?.slotCustomRow ? (
             (row.value as CustomRowConfig).slotCustomRow({
               item: row,
               state,
@@ -453,8 +465,11 @@ const TableRoot = <TableRowData extends BaseTableRowData | CustomRowConfig>(prop
                     cell={cell}
                     state={state}
                     isActionable={
-                      ((cell as GridNode<TableRowData>).column?.value as ColumnDef<TableRowData>)
-                        ?.isActionable
+                      (
+                        (cell as GridNode<TableRowData>).column?.value as
+                          | ColumnDef<TableRowData>
+                          | undefined
+                      )?.isActionable
                     }
                   />
                 )
@@ -562,40 +577,29 @@ const TableColumnHeader = <TableRowData extends BaseTableRowData>({
   const { columnHeaderProps } = useTableColumnHeader({ node: column }, state, ref);
   const { focusProps } = useFocusRing();
 
-  const { uiRefresh } = testFlags;
-
   return (
     <$Th
       {...mergeProps(columnHeaderProps, focusProps)}
       // data-focused={isFocusVisible || undefined}
-      style={{ width: column.props?.width }}
+      style={{
+        width: column.props?.width,
+        textAlign: (column.value as any)?.align,
+      }}
       ref={ref}
       allowSorting={column.props?.allowsSorting ?? true}
       withScrollSnapColumns={withScrollSnapColumns}
     >
-      <$Row uiRefreshEnabled={uiRefresh}>
+      <$Row>
         {column.rendered}
-        {(column.props.allowsSorting ?? true) &&
-          (uiRefresh ? (
-            <SortIcon
-              sortDirection={
-                state.sortDescriptor?.column === column.key
-                  ? state.sortDescriptor?.direction ?? 'none'
-                  : 'none'
-              }
-            />
-          ) : (
-            <$SortArrow
-              aria-hidden="true"
-              sortDirection={
-                state.sortDescriptor?.column === column.key
-                  ? state.sortDescriptor?.direction ?? 'none'
-                  : 'none'
-              }
-            >
-              <Icon iconName={IconName.Triangle} aria-hidden="true" />
-            </$SortArrow>
-          ))}
+        {(column.props.allowsSorting ?? true) && (
+          <SortIcon
+            sortDirection={
+              state.sortDescriptor.column === column.key
+                ? state.sortDescriptor.direction ?? 'none'
+                : 'none'
+            }
+          />
+        )}
       </$Row>
     </$Th>
   );
@@ -861,7 +865,6 @@ const $Th = styled.th<{ allowSorting: boolean; withScrollSnapColumns?: boolean }
         `
       : css`
           cursor: default;
-          pointer-events: none;
         `}
 
   white-space: nowrap;
@@ -887,31 +890,6 @@ const $Td = styled.td`
   > * {
     vertical-align: middle;
   }
-`;
-
-const $SortArrow = styled.span<{ sortDirection: 'ascending' | 'descending' | 'none' }>`
-  float: right;
-  margin-left: auto;
-
-  display: inline-flex;
-  transition:
-    transform 0.3s var(--ease-out-expo),
-    font-size 0.3s var(--ease-out-expo);
-
-  font-size: 0.375em;
-
-  ${({ sortDirection }) =>
-    ({
-      ascending: css`
-        transform: scaleY(-1);
-      `,
-      descending: css`
-        transform: scaleY(1);
-      `,
-      none: css`
-        visibility: hidden;
-      `,
-    })[sortDirection]}
 `;
 
 const $Thead = styled.thead<TableStyleProps>`
@@ -1030,9 +1008,9 @@ const $Tbody = styled.tbody<TableStyleProps>`
     `}
 `;
 
-const $Row = styled.div<{ uiRefreshEnabled: boolean }>`
+const $Row = styled.div`
   ${layoutMixins.inlineRow}
   padding: var(--tableCell-padding);
 
-  gap: ${({ uiRefreshEnabled }) => (uiRefreshEnabled ? css`0.25ch;` : css`0.5ch`)};
+  gap: 0.33ch;
 `;

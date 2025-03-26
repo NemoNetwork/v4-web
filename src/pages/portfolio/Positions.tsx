@@ -66,13 +66,16 @@ export const Positions = () => {
                 ]
               : [
                   PositionsTableColumnKey.Market,
+                  PositionsTableColumnKey.Leverage,
+                  PositionsTableColumnKey.Type,
                   PositionsTableColumnKey.Size,
+                  PositionsTableColumnKey.Value,
+                  PositionsTableColumnKey.PnL,
                   PositionsTableColumnKey.Margin,
-                  PositionsTableColumnKey.UnrealizedPnl,
-                  PositionsTableColumnKey.RealizedPnl,
+                  PositionsTableColumnKey.AverageOpen,
+                  PositionsTableColumnKey.Oracle,
+                  PositionsTableColumnKey.Liquidation,
                   PositionsTableColumnKey.NetFunding,
-                  PositionsTableColumnKey.AverageOpenAndClose,
-                  PositionsTableColumnKey.LiquidationAndOraclePrice,
                   shouldRenderTriggers && PositionsTableColumnKey.Triggers,
                   shouldRenderActions && PositionsTableColumnKey.Actions,
                 ].filter(isTruthy)

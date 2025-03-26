@@ -9,6 +9,10 @@ import { type DetailsItem } from '@/components/Details';
 import { DetailsDialog } from '@/components/DetailsDialog';
 import { OrderSideTag } from '@/components/OrderSideTag';
 import { Output, OutputType } from '@/components/Output';
+import {
+  getIndexerFillTypeStringKey,
+  getIndexerLiquidityStringKey,
+} from '@/views/tables/enumToStringKeyHelpers';
 
 import { getFillDetails } from '@/state/accountSelectors';
 
@@ -18,42 +22,43 @@ export const FillDetailsDialog = ({ fillId, setIsOpen }: DialogProps<FillDetails
   const stringGetter = useStringGetter();
 
   const {
-    asset,
-    createdAtMilliseconds,
-    displayId,
+    createdAt,
     fee,
-    marketId,
-    orderSide,
+    side,
+    type,
     price,
-    resources,
     size,
     stepSizeDecimals,
     tickSizeDecimals,
-  } = useParameterizedSelector(getFillDetails, fillId)! ?? {};
+    marketSummary,
+    market,
+    liquidity,
+  } = useParameterizedSelector(getFillDetails, fillId) ?? {};
 
   const detailItems = (
     [
       {
         key: 'market',
         label: stringGetter({ key: STRING_KEYS.MARKET }),
-        value: displayId,
+        value: marketSummary?.displayableTicker,
       },
       {
         key: 'market-id',
         label: stringGetter({ key: STRING_KEYS.TICKER }),
-        value: marketId,
+        value: market,
       },
       {
         key: 'side',
         label: stringGetter({ key: STRING_KEYS.SIDE }),
-        value: <OrderSideTag orderSide={orderSide!} />,
+        value: side != null ? <OrderSideTag orderSide={side} /> : undefined,
       },
       {
         key: 'liquidity',
         label: stringGetter({ key: STRING_KEYS.LIQUIDITY }),
-        value: resources.liquidityStringKey
-          ? stringGetter({ key: resources.liquidityStringKey })
-          : null,
+        value:
+          liquidity != null
+            ? stringGetter({ key: getIndexerLiquidityStringKey(liquidity) })
+            : undefined,
       },
       {
         key: 'amount',
@@ -63,12 +68,21 @@ export const FillDetailsDialog = ({ fillId, setIsOpen }: DialogProps<FillDetails
       {
         key: 'price',
         label: stringGetter({ key: STRING_KEYS.PRICE }),
-        value: <Output type={OutputType.Fiat} value={price} fractionDigits={tickSizeDecimals} />,
+        value: (
+          <Output
+            withSubscript
+            type={OutputType.Fiat}
+            value={price}
+            fractionDigits={tickSizeDecimals}
+          />
+        ),
       },
       {
         key: 'total',
         label: stringGetter({ key: STRING_KEYS.TOTAL }),
-        value: <Output type={OutputType.Fiat} value={MustBigNumber(price).times(size)} />,
+        value: (
+          <Output type={OutputType.Fiat} value={MustBigNumber(price).times(MustBigNumber(size))} />
+        ),
       },
       {
         key: 'fee',
@@ -80,15 +94,18 @@ export const FillDetailsDialog = ({ fillId, setIsOpen }: DialogProps<FillDetails
       {
         key: 'created-at',
         label: stringGetter({ key: STRING_KEYS.CREATED_AT }),
-        value: <Output type={OutputType.DateTime} value={createdAtMilliseconds} />,
+        value:
+          createdAt != null ? (
+            <Output type={OutputType.DateTime} value={new Date(createdAt).getTime()} />
+          ) : undefined,
       },
     ] satisfies DetailsItem[]
   ).filter((item) => Boolean(item.value));
 
   return (
     <DetailsDialog
-      slotIcon={<AssetIcon symbol={asset?.id} tw="text-[1em]" />}
-      title={resources.typeStringKey && stringGetter({ key: resources.typeStringKey })}
+      slotIcon={<AssetIcon logoUrl={marketSummary?.logo} symbol={marketSummary?.assetId} />}
+      title={type && stringGetter({ key: getIndexerFillTypeStringKey(type) })}
       items={detailItems}
       setIsOpen={setIsOpen}
     />

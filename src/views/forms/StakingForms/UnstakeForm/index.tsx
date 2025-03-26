@@ -18,7 +18,7 @@ import { NumberSign } from '@/constants/numbers';
 import { StakeFormSteps } from '@/constants/stakingForms';
 
 import { useAccountBalance } from '@/hooks/useAccountBalance';
-import { useStakingValidator } from '@/hooks/useStakingValidator';
+import { refreshStakingData, useStakingValidator } from '@/hooks/useStakingValidator';
 import { useStringGetter } from '@/hooks/useStringGetter';
 import { useSubaccount } from '@/hooks/useSubaccount';
 import { useTokenConfigs } from '@/hooks/useTokenConfigs';
@@ -57,7 +57,7 @@ export const UnstakeForm = ({
   const stringGetter = useStringGetter();
   const { undelegate, getUndelegateFee } = useSubaccount();
   const { nativeTokenBalance } = useAccountBalance();
-  const { currentDelegations } = useStakingValidator() ?? {};
+  const { currentDelegations } = useStakingValidator();
   const { chainTokenLabel, chainTokenDecimals } = useTokenConfigs();
 
   // Form states
@@ -70,10 +70,8 @@ export const UnstakeForm = ({
     return (
       Object.keys(amounts).length > 0 &&
       Object.keys(amounts).every((validator) => {
-        const balance = parseFloat(
-          currentDelegations?.find((delegation) => delegation.validator === validator)?.amount ??
-            '0'
-        );
+        const balance =
+          currentDelegations.find((delegation) => delegation.validator === validator)?.amount ?? 0;
         const validatorAmount = amounts[validator];
         if (!validatorAmount) return true;
         return validatorAmount && validatorAmount > 0 && balance && validatorAmount <= balance;
@@ -115,7 +113,7 @@ export const UnstakeForm = ({
       getUndelegateFee(amounts)
         .then((stdFee) => {
           if (stdFee.amount.length > 0) {
-            const feeAmount = stdFee.amount[0].amount;
+            const feeAmount = stdFee.amount[0]!.amount;
             setFee(MustBigNumber(formatUnits(BigInt(feeAmount), chainTokenDecimals)));
           }
         })
@@ -139,6 +137,8 @@ export const UnstakeForm = ({
       setIsLoading(true);
       const tx = await undelegate(amounts);
       const txHash = hashFromTx(tx.hash);
+
+      refreshStakingData();
 
       track(
         AnalyticsEvents.UnstakeTransaction({
@@ -177,7 +177,7 @@ export const UnstakeForm = ({
           hasInvalidNewValue={MustBigNumber(newStakedBalance).isNegative()}
           withDiff={
             newStakedBalance !== undefined &&
-            !MustBigNumber(nativeTokenBalance).eq(newStakedBalance ?? 0)
+            !MustBigNumber(nativeTokenBalance).eq(newStakedBalance)
           }
         />
       ),

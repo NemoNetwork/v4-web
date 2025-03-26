@@ -1,20 +1,18 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
-import {
-  STRING_KEYS,
-  SUPPORTED_LOCALE_STRING_LABELS,
-  SupportedLocales,
-} from '@/constants/localization';
+import { STRING_KEYS, SUPPORTED_LOCALES, SupportedLocales } from '@/constants/localization';
 import type { MenuItem } from '@/constants/menus';
 import { DydxNetwork } from '@/constants/networks';
 import { AppRoute, MobileSettingsRoute } from '@/constants/routes';
 
+import { usePreferenceMenu } from '@/hooks/usePreferenceMenu';
 import { useSelectedNetwork } from '@/hooks/useSelectedNetwork';
 import { useStringGetter } from '@/hooks/useStringGetter';
 
-import { ComingSoonSpace } from '@/components/ComingSoon';
+import { ComboboxMenu } from '@/components/ComboboxMenu';
 import { PageMenu } from '@/components/PageMenu';
 import { PageMenuItemType } from '@/components/PageMenu/PageMenuItem';
+import { DisplaySettings } from '@/views/DisplaySettings';
 import { useNetworks } from '@/views/menus/useNetworks';
 
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
@@ -39,13 +37,7 @@ const SettingsPage = () => {
       type: PageMenuItemType.Navigation,
       href: `${AppRoute.Settings}/${MobileSettingsRoute.Language}`,
       label: stringGetter({ key: STRING_KEYS.LANGUAGE }),
-      labelRight: SUPPORTED_LOCALE_STRING_LABELS[selectedLocale],
-    },
-    {
-      value: 'notification-nav-item',
-      type: PageMenuItemType.Navigation,
-      href: `${AppRoute.Settings}/${MobileSettingsRoute.Notifications}`,
-      label: stringGetter({ key: STRING_KEYS.NOTIFICATIONS }),
+      labelRight: SUPPORTED_LOCALES.find(({ locale }) => locale === selectedLocale)?.label,
     },
     {
       value: 'network-nav-item',
@@ -54,9 +46,21 @@ const SettingsPage = () => {
       label: stringGetter({ key: STRING_KEYS.NETWORK }),
       labelRight: selectedNetworkConfig && (
         <>
-          {selectedNetworkConfig?.slotBefore} <span>{selectedNetworkConfig?.label}</span>
+          {selectedNetworkConfig.slotBefore} <span>{selectedNetworkConfig.label}</span>
         </>
       ),
+    },
+    {
+      value: 'preferences-nav-item',
+      type: PageMenuItemType.Navigation,
+      href: `${AppRoute.Settings}/${MobileSettingsRoute.Preferences}`,
+      label: stringGetter({ key: STRING_KEYS.PREFERENCES }),
+    },
+    {
+      value: 'display-settings-nav-item',
+      type: PageMenuItemType.Navigation,
+      href: `${AppRoute.Settings}/${MobileSettingsRoute.Display}`,
+      label: stringGetter({ key: STRING_KEYS.DISPLAY_SETTINGS }),
     },
   ];
 
@@ -67,9 +71,9 @@ const SettingsPage = () => {
     onSelect: (locale: string) => {
       dispatch(setSelectedLocale({ locale: locale as SupportedLocales }));
     },
-    subitems: Object.values(SupportedLocales).map((locale) => ({
+    subitems: SUPPORTED_LOCALES.map(({ locale, label }) => ({
       value: locale as string,
-      label: SUPPORTED_LOCALE_STRING_LABELS[locale],
+      label,
     })),
   };
 
@@ -81,6 +85,8 @@ const SettingsPage = () => {
     subitems: networks as MenuItem<DydxNetwork, PageMenuItemType>[],
   };
 
+  const preferencesMenuItems = usePreferenceMenu();
+
   return (
     <>
       <SettingsHeader pathname={pathname} stringGetter={stringGetter} />
@@ -91,13 +97,14 @@ const SettingsPage = () => {
           element={<PageMenu group="language" items={[languages]} />}
         />
         <Route
-          path={MobileSettingsRoute.Notifications}
-          element={<ComingSoonSpace />} // <PageMenu group="notifications" items={[]} />
+          path={MobileSettingsRoute.Preferences}
+          element={<ComboboxMenu items={preferencesMenuItems} withSearch={false} />}
         />
         <Route
           path={MobileSettingsRoute.Network}
           element={<PageMenu group="network" items={[networkMenuItems]} />}
         />
+        <Route path={MobileSettingsRoute.Display} element={<DisplaySettings tw="px-1.5 py-1" />} />
         <Route path="*" element={<Navigate to="" replace />} />
       </Routes>
     </>

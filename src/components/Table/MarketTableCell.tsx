@@ -1,47 +1,47 @@
+import { PerpetualMarketSummary } from '@/bonsai/types/summaryTypes';
+
 import type { Asset } from '@/constants/abacus';
 
 import { AssetIcon } from '@/components/AssetIcon';
-import { Icon, IconName } from '@/components/Icon';
 
-import { Output, OutputType, ShowSign } from '../Output';
+import { getDisplayableAssetFromBaseAsset } from '@/lib/assetUtils';
+
 import { TableCell } from './TableCell';
 
-export const MarketTableCell = ({
-  asset,
-  marketId,
-  leverage,
-  showFavorite,
-  isHighlighted,
-  className,
+export const MarketTableCell = ({ asset }: { asset?: Asset }) => {
+  return (
+    <TableCell
+      tw="font-bold text-color-text-2"
+      slotLeft={
+        <AssetIcon
+          tw="[--asset-icon-size:1.25rem] tablet:[--asset-icon-size:2.25rem]"
+          logoUrl={asset?.resources?.imageUrl}
+          symbol={asset?.id}
+        />
+      }
+    >
+      {getDisplayableAssetFromBaseAsset(asset?.id ?? '')}
+    </TableCell>
+  );
+};
+
+export const MarketSummaryTableCell = ({
+  marketSummary,
 }: {
-  asset?: Asset;
-  marketId: string;
-  leverage?: number;
-  showFavorite?: boolean;
-  isHighlighted?: boolean;
-  className?: string;
-}) => (
-  <TableCell
-    className={className}
-    isHighlighted={isHighlighted}
-    stacked
-    slotLeft={
-      <>
-        {showFavorite && <Icon iconName={IconName.Star} />}
-        <AssetIcon symbol={asset?.id} tw="text-[1.25rem] tablet:text-[2.25rem]" />
-      </>
-    }
-  >
-    {leverage ? (
-      <>
-        <span>{marketId}</span>
-        <Output type={OutputType.Multiple} value={leverage} showSign={ShowSign.None} />
-      </>
-    ) : (
-      <>
-        <span tw="tablet:text-color-text-2">{asset?.name}</span>
-        <span>{marketId}</span>
-      </>
-    )}
-  </TableCell>
-);
+  marketSummary?: PerpetualMarketSummary;
+}) => {
+  return (
+    <TableCell
+      tw="font-bold text-color-text-2"
+      slotLeft={
+        <AssetIcon
+          tw="[--asset-icon-size:1.25rem] tablet:[--asset-icon-size:2.25rem]"
+          logoUrl={marketSummary?.logo}
+          symbol={marketSummary?.assetId}
+        />
+      }
+    >
+      {marketSummary?.displayableAsset ?? ''}
+    </TableCell>
+  );
+};

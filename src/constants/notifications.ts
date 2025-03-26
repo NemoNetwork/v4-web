@@ -7,6 +7,8 @@ export enum NotificationType {
   // So the notifications don't get retriggered
   // It's pretty scary getting a bunch of unexpected withdrawal notifications
   SkipTransfer = 'SquidTransfer',
+  SkipTransfer2 = 'SkipTransfer2',
+  FunkitDeposit = 'FunkitDeposit',
   TriggerOrder = 'TriggerOrder',
   ReleaseUpdates = 'ReleaseUpdates',
   ApiError = 'ApiError',
@@ -15,6 +17,7 @@ export enum NotificationType {
   MarketUpdate = 'MarketUpdate',
   MarketWindDown = 'MarketWindDown',
   FeedbackRequest = 'FeedbackRequest',
+  PredictionMarketConcluded = 'PredictionMarketConcluded',
   Custom = 'Custom', // custom notifications triggered by components eg user input errors
 }
 
@@ -32,6 +35,8 @@ export const NotificationTypeCategory: {
 } = {
   [NotificationType.ReleaseUpdates]: NotificationCategoryPreferences.General,
   [NotificationType.SkipTransfer]: NotificationCategoryPreferences.Transfers,
+  [NotificationType.SkipTransfer2]: NotificationCategoryPreferences.Transfers,
+  [NotificationType.FunkitDeposit]: NotificationCategoryPreferences.Transfers,
   [NotificationType.AbacusGenerated]: NotificationCategoryPreferences.Trading,
   [NotificationType.TriggerOrder]: NotificationCategoryPreferences.Trading,
   [NotificationType.OrderStatus]: NotificationCategoryPreferences.Trading,
@@ -40,6 +45,7 @@ export const NotificationTypeCategory: {
   [NotificationType.MarketUpdate]: NotificationCategoryPreferences.MustSee,
   [NotificationType.MarketWindDown]: NotificationCategoryPreferences.MustSee,
   [NotificationType.FeedbackRequest]: NotificationCategoryPreferences.MustSee,
+  [NotificationType.PredictionMarketConcluded]: NotificationCategoryPreferences.MustSee,
   [NotificationType.Custom]: NotificationCategoryPreferences.MustSee,
 };
 
@@ -145,7 +151,8 @@ export type Notifications = Record<NotificationId, Notification<any>>;
 export type NotificationDisplayData = {
   icon?: React.ReactNode;
   title: string; // Title for Toast, Notification, and Push Notification
-  body?: string | React.ReactNode; // Description body for Toast, Notification, and Push Notification
+  body?: string; // Description body for Toast, Notification, and Push Notification
+  searchableContent?: string; // never rendered, but searchable
 
   slotTitleLeft?: React.ReactNode;
   slotTitleRight?: React.ReactNode;
@@ -207,6 +214,7 @@ export enum TransferNotificationTypes {
   Deposit = 'deposit',
 }
 
+// TODO: fix typo
 export type TransferNotifcation = {
   id?: string;
   txHash: string;
@@ -226,11 +234,12 @@ export type TransferNotifcation = {
 };
 
 export enum ReleaseUpdateNotificationIds {
-  DiscoveryProgram = 'discovery-program',
-  Twitter200BVolume = 'twitter-200b-volume',
-  IncentivesS6Ended = 'incentives-s6-ended',
-  KeplrSupport = 'keplr-support',
-  PhantomSupport = 'phantom-support',
+  DiscoveryProgram = 'discovery-program', // Deprecated
+  Twitter200BVolume = 'twitter-200b-volume', // Deprecated
+  IncentivesS6Ended = 'incentives-s6-ended', // Deprecated
+  KeplrSupport = 'keplr-support', // Deprecated
+  PhantomSupport = 'phantom-support', // Deprecated
+  SimpleIosExperience = 'simple-ios-experience', // Deprecated
 }
 
 // Incentives Season
@@ -250,19 +259,20 @@ export function getSeasonRewardDistributionNumber(seasonId: IncentivesDistribute
 }
 
 export enum MarketLaunchNotificationIds {
-  TrumpWin = 'market-launch-trumpwin',
+  TrumpWin = 'market-launch-trumpwin', // Deprecated
 }
 
 export enum MarketWindDownNotificationIds {
-  MarketWindDownFetAgix = 'market-wind-down-fet-agix',
-  MarketWindDownProposalFetAgix = 'market-wind-down-proposal-fet-agix',
-  MarketUpdateProposalRndr = 'market-update-proposal-rndr',
-  MarketWindDownMatic = 'market-wind-down-matic',
-  MarketWindDownProposalMatic = 'market-wind-down-proposal-matic',
+  MarketWindDownFetAgix = 'market-wind-down-fet-agix', // Deprecated
+  MarketWindDownProposalFetAgix = 'market-wind-down-proposal-fet-agix', // Deprecated
+  MarketUpdateProposalRndr = 'market-update-proposal-rndr', // Deprecated
+  MarketWindDownMatic = 'market-wind-down-matic', // Deprecated
+  MarketWindDownProposalMatic = 'market-wind-down-proposal-matic', // Deprecated
 }
 
 export enum MarketUpdateNotificationIds {
-  MarketUpdateSolLiquidityTier = 'market-update-sol-liquidity-tier',
+  MarketUpdateSolLiquidityTier = 'market-update-sol-liquidity-tier', // Deprecated
+  MarketUpdateProposal226 = 'market-update-proposal-226', // Deprecated
 }
 
 export enum FeedbackRequestNotificationIds {

@@ -3,7 +3,7 @@ import { ENVIRONMENT_CONFIG_MAP } from '@/constants/networks';
 import { getSelectedNetwork } from '@/state/appSelectors';
 import { useAppSelector } from '@/state/appTypes';
 
-interface EndpointsConfig {
+export interface EndpointsConfig {
   indexers: {
     api: string;
     socket: string;
@@ -16,6 +16,7 @@ interface EndpointsConfig {
   faucet?: string;
   stakingAPR?: string;
   solanaRpcUrl: string;
+  affiliates?: string;
 }
 
 export const useEndpointsConfig = () => {
@@ -23,7 +24,7 @@ export const useEndpointsConfig = () => {
   const endpointsConfig: EndpointsConfig = ENVIRONMENT_CONFIG_MAP[selectedNetwork].endpoints;
 
   return {
-    indexer: endpointsConfig.indexers[0], // assume there's only one option for indexer endpoints
+    indexer: endpointsConfig.indexers[0]!, // assume there's only one option for indexer endpoints
     validators: endpointsConfig.validators,
     skip: endpointsConfig.skip,
     nobleValidator: endpointsConfig.nobleValidator,
@@ -32,5 +33,6 @@ export const useEndpointsConfig = () => {
     faucet: endpointsConfig.faucet,
     stakingAPR: endpointsConfig.stakingAPR,
     solanaRpcUrl: endpointsConfig.solanaRpcUrl,
+    affiliatesBaseUrl: endpointsConfig.affiliates,
   };
 };

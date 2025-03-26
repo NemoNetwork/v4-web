@@ -1,9 +1,11 @@
-import { type ReactNode, type Ref } from 'react';
+import { useRef, type ReactNode, type Ref } from 'react';
 
 import { Content, List, Root, Trigger } from '@radix-ui/react-tabs';
 import styled, { css, keyframes } from 'styled-components';
 
 import { type MenuItem } from '@/constants/menus';
+
+import { useFadeOnHorizontalScrollContainer } from '@/hooks/useFadeOnHorizontalScrollContainer';
 
 import breakpoints from '@/styles/breakpoints';
 import { layoutMixins } from '@/styles/layoutMixins';
@@ -14,7 +16,6 @@ import { Tag } from '@/components/Tag';
 import { Toolbar } from '@/components/Toolbar';
 
 import { getSimpleStyledOutputType } from '@/lib/genericFunctionalComponentUtils';
-import { testFlags } from '@/lib/testFlags';
 
 export type TabItem<TabItemsValue> = {
   value: TabItemsValue;
@@ -67,9 +68,13 @@ export const Tabs = <TabItemsValue extends string>({
   className,
 }: ElementProps<TabItemsValue> & StyleProps) => {
   const currentItem = items.find((item) => item.value === value);
-  const { uiRefresh } = testFlags;
   const withBorders = dividerStyle === 'border';
   const withUnderline = dividerStyle === 'underline';
+
+  const headerRef = useRef<HTMLDivElement>(null);
+  const { showFadeStart, showFadeEnd } = useFadeOnHorizontalScrollContainer({
+    scrollRef: headerRef,
+  });
 
   const triggers = (
     <>
@@ -84,7 +89,7 @@ export const Tabs = <TabItemsValue extends string>({
                 $withUnderline={withUnderline}
                 disabled={disabled}
               >
-                {item.label}
+                <$Label>{item.label}</$Label>
                 {item.tag && <Tag>{item.tag}</Tag>}
                 {item.slotRight}
               </$Trigger>
@@ -103,7 +108,7 @@ export const Tabs = <TabItemsValue extends string>({
               }
               disabled={disabled}
             >
-              {item.label}
+              <$Label>{item.label}</$Label>
             </$DropdownSelectMenu>
           )
         )}
@@ -113,6 +118,12 @@ export const Tabs = <TabItemsValue extends string>({
         <Toolbar>{currentItem?.slotToolbar ?? slotToolbar}</Toolbar>
       )}
     </>
+  );
+
+  const header = (
+    <$Header $side={side} ref={headerRef}>
+      {triggers}
+    </$Header>
   );
 
   return (
@@ -126,9 +137,14 @@ export const Tabs = <TabItemsValue extends string>({
       onWheel={onWheel}
       $side={side}
       $withInnerBorder={withBorders || withUnderline}
-      $uiRefreshEnabled={uiRefresh}
     >
-      <$Header $side={side}>{triggers}</$Header>
+      <$HorizontalScrollContainer
+        $side={side}
+        showFadeStart={showFadeStart}
+        showFadeEnd={showFadeEnd}
+      >
+        {header}
+      </$HorizontalScrollContainer>
 
       {sharedContent ?? (
         <div tw="stack shadow-none">
@@ -154,7 +170,6 @@ export const Tabs = <TabItemsValue extends string>({
 const $Root = styled(Root)<{
   $side: 'top' | 'bottom';
   $withInnerBorder?: boolean;
-  $uiRefreshEnabled: boolean;
 }>`
   /* Overrides */
   --trigger-backgroundColor: var(--color-layer-2);
@@ -163,9 +178,7 @@ const $Root = styled(Root)<{
   --trigger-active-backgroundColor: var(--color-layer-1);
   --trigger-active-textColor: var(--color-text-2);
   --trigger-hover-textColor: var(--trigger-active-textColor);
-  --trigger-active-underlineColor: ${({ $uiRefreshEnabled }) => css`
-    ${$uiRefreshEnabled ? css`var(--color-accent);` : css`var(--color-text-2);`}
-  `};
+  --trigger-active-underlineColor: var(--color-accent);
   --trigger-active-underline-backgroundColor: transparent;
   --trigger-active-underline-size: 2px;
   --trigger-underline-size: 0px;
@@ -212,8 +225,13 @@ const $Root = styled(Root)<{
   }
 `;
 
-const $Header = styled.header<{ $side: 'top' | 'bottom' }>`
-  ${layoutMixins.contentSectionDetachedScrollable}
+const $HorizontalScrollContainer = styled.div<{
+  showFadeStart: boolean;
+  showFadeEnd: boolean;
+  $side: 'top' | 'bottom';
+}>`
+  ${layoutMixins.horizontalFadeScrollArea}
+  --scrollArea-fade-zIndex: calc(var(--stickyHeader-zIndex) + 1);
 
   ${({ $side }) =>
     ({
@@ -226,8 +244,29 @@ const $Header = styled.header<{ $side: 'top' | 'bottom' }>`
       `,
     })[$side]}
 
+  ${({ showFadeStart }) =>
+    !showFadeStart &&
+    css`
+      &:before {
+        opacity: 0;
+      }
+    `}
+
+  ${({ showFadeEnd }) =>
+    !showFadeEnd &&
+    css`
+      &:after {
+        opacity: 0;
+      }
+    `};
+`;
+
+const $Header = styled.header<{ $side: 'top' | 'bottom' }>`
+  ${layoutMixins.contentSectionDetachedScrollable}
+  flex: 1;
   ${layoutMixins.row}
   justify-content: space-between;
+  background-color: var(--trigger-backgroundColor);
   z-index: var(--stickyHeader-zIndex);
 `;
 
@@ -269,6 +308,11 @@ const $Trigger = styled(Trigger)<{
       ${tabMixins.tabTriggerUnderlineStyle}
     `}
 `;
+
+const $Label = styled.div`
+  ${layoutMixins.textTruncate}
+`;
+
 const $Content = styled(Content)<{ $hide?: boolean; $withTransitions: boolean }>`
   ${layoutMixins.flexColumn}
   outline: none;
@@ -278,14 +322,11 @@ const $Content = styled(Content)<{ $hide?: boolean; $withTransitions: boolean }>
     pointer-events: none;
   }
 
-  &[data-state='active'] {
-    z-index: var(--activeTab-zIndex);
-  }
-
   ${({ $hide }) =>
     $hide &&
     css`
       display: none;
+      opacity: 0;
     `}
 
   @media (prefers-reduced-motion: no-preference) {
@@ -297,7 +338,6 @@ const $Content = styled(Content)<{ $hide?: boolean; $withTransitions: boolean }>
             from {
               translate: 0 -0.25rem -1.5rem;
               opacity: 0;
-              /* filter: blur(3px); */
             }
           `} 0.2s var(--ease-out-expo);
         }
@@ -309,7 +349,6 @@ const $Content = styled(Content)<{ $hide?: boolean; $withTransitions: boolean }>
             to {
               translate: 0 -0.25rem -1.5rem;
               opacity: 0;
-              /* filter: blur(3px); */
             }
           `} 0.2s var(--ease-out-expo);
         }
@@ -321,9 +360,9 @@ const $DropdownTabTrigger = styled(Trigger)<{
   $withUnderline?: boolean;
 }>`
   ${tabMixins.tabTriggerStyle}
-  gap: 1ch;
   height: 100%;
   width: 100%;
+  --trigger-hover-filter: none;
 
   ${({ $withUnderline }) =>
     $withUnderline &&
@@ -367,7 +406,7 @@ export const MobileTabs = styled(Tabs)`
   padding-bottom: 1rem;
   gap: var(--border-width);
 
-  > header {
+  > div > header {
     padding: 0 1rem;
 
     button {

@@ -14,7 +14,6 @@ import { WithdrawForm } from '@/views/forms/AccountManagementForms/WithdrawForm'
 export const WithdrawDialog = ({ setIsOpen }: DialogProps<WithdrawDialogProps>) => {
   const stringGetter = useStringGetter();
   const { isTablet } = useBreakpoints();
-
   return (
     <Dialog
       isOpen

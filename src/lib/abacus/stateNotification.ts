@@ -1,48 +1,27 @@
+// eslint-disable-next-line max-classes-per-file
 import { kollections } from '@dydxprotocol/v4-abacus';
-import { fromPairs } from 'lodash';
 
 import type {
-  AbacusApiState,
   AbacusNotification,
   AbacusStateNotificationProtocol,
-  AccountBalance,
   Nullable,
   ParsingErrors,
-  PerpetualMarket,
   PerpetualState,
   PerpetualStateChanges,
   SubaccountOrder,
 } from '@/constants/abacus';
 import { Changes } from '@/constants/abacus';
 import { NUM_PARENT_SUBACCOUNTS } from '@/constants/account';
+import { AnalyticsEvents } from '@/constants/analytics';
 
 import { type RootStore } from '@/state/_store';
-import {
-  setBalances,
-  setChildSubaccount,
-  setCompliance,
-  setFills,
-  setFundingPayments,
-  setHistoricalPnl,
-  setRestrictionType,
-  setStakingBalances,
-  setStakingDelegations,
-  setStakingRewards,
-  setSubaccount,
-  setTradingRewards,
-  setTransfers,
-  setUnbondingDelegations,
-  setWallet,
-} from '@/state/account';
-import { setApiState } from '@/state/app';
-import { setAssets } from '@/state/assets';
-import { setConfigs } from '@/state/configs';
+import { setSubaccountForPostOrders } from '@/state/account';
 import { setInputs } from '@/state/inputs';
-import { setLatestOrder, updateFilledOrders, updateOrders } from '@/state/localOrders';
+import { setLatestOrder } from '@/state/localOrders';
 import { updateNotifications } from '@/state/notifications';
-import { setHistoricalFundings, setLiveTrades, setMarkets, setOrderbook } from '@/state/perpetuals';
+import { setAbacusHasMarkets } from '@/state/perpetuals';
 
-import { isTruthy } from '../isTruthy';
+import { track } from '../analytics/analytics';
 
 class AbacusStateNotifier implements AbacusStateNotificationProtocol {
   private store: RootStore | undefined;
@@ -64,206 +43,51 @@ class AbacusStateNotifier implements AbacusStateNotificationProtocol {
     if (!this.store) return;
     const { dispatch } = this.store;
     const changes = new Set(incomingChanges?.changes.toArray() ?? []);
-    const marketIds = incomingChanges?.markets?.toArray();
     const subaccountNumbers = incomingChanges?.subaccountNumbers?.toArray();
 
     if (updatedState) {
-      if (changes.has(Changes.assets)) {
-        dispatch(
-          setAssets(
-            Object.fromEntries(
-              (updatedState?.assetIds()?.toArray() ?? [])
-                .map((assetId: string) => {
-                  const assetData = updatedState?.asset(assetId);
-                  if (assetData == null) {
-                    return undefined;
-                  }
-                  return [assetId, assetData];
-                })
-                .filter(isTruthy)
-            )
-          )
-        );
-      }
-
-      if (changes.has(Changes.accountBalances)) {
-        if (updatedState.account?.balances) {
-          const balances: Record<string, AccountBalance> = fromPairs(
-            updatedState.account.balances.toArray().map(({ k, v }) => [k, v])
-          );
-          dispatch(setBalances(balances));
-        }
-        if (updatedState.account?.stakingBalances) {
-          const stakingBalances: Record<string, AccountBalance> = fromPairs(
-            updatedState.account.stakingBalances.toArray().map(({ k, v }) => [k, v])
-          );
-          dispatch(setStakingBalances(stakingBalances));
-        }
-        if (updatedState.account?.stakingDelegations) {
-          dispatch(setStakingDelegations(updatedState.account.stakingDelegations.toArray()));
-        }
-        if (updatedState.account?.unbondingDelegation) {
-          dispatch(setUnbondingDelegations(updatedState.account.unbondingDelegation.toArray()));
-        }
-        if (updatedState.account?.stakingRewards) {
-          dispatch(setStakingRewards(updatedState.account.stakingRewards));
-        }
-      }
-
-      if (changes.has(Changes.tradingRewards)) {
-        if (updatedState.account?.tradingRewards) {
-          dispatch(setTradingRewards(updatedState.account?.tradingRewards));
-        }
-      }
-
-      if (changes.has(Changes.configs)) {
-        dispatch(setConfigs(updatedState.configs));
-      }
-
       if (changes.has(Changes.input)) {
         dispatch(setInputs(updatedState.input));
       }
 
-      if (changes.has(Changes.wallet)) {
-        dispatch(setWallet(updatedState.wallet));
-      }
-
+      // this can be migrated when the trade/close position forms are migrated
       if (changes.has(Changes.markets)) {
         dispatch(
-          setMarkets({
-            markets: Object.fromEntries(
-              (marketIds ?? updatedState.marketIds()?.toArray() ?? [])
-                .map((marketId: string): undefined | [string, PerpetualMarket] => {
-                  const marketData = updatedState.market(marketId);
-                  if (marketData == null) {
-                    return undefined;
-                  }
-                  return [marketId, marketData];
-                })
-                .filter(isTruthy)
-            ),
-            update: !!marketIds,
-          })
+          setAbacusHasMarkets(
+            updatedState.marketIds() != null && updatedState.marketIds()!.size > 0
+          )
         );
       }
 
-      if (changes.has(Changes.restriction)) {
-        dispatch(setRestrictionType(updatedState.restriction));
-      }
-
-      if (changes.has(Changes.compliance) && updatedState.compliance) {
-        dispatch(setCompliance(updatedState.compliance));
-      }
-
+      // this can be migrated when all forms are migrated
       subaccountNumbers?.forEach((subaccountId: number) => {
-        const isChildSubaccount = subaccountId >= NUM_PARENT_SUBACCOUNTS;
-        const childSubaccountUpdate: Parameters<typeof setChildSubaccount>[0] = {};
-
         if (changes.has(Changes.subaccount)) {
           const subaccountData = updatedState.subaccount(subaccountId);
-          if (isChildSubaccount) {
-            childSubaccountUpdate[subaccountId] = subaccountData;
-          } else {
-            dispatch(setSubaccount(subaccountData));
-            dispatch(updateOrders(subaccountData?.orders?.toArray() ?? []));
+          const isChildSubaccount = subaccountId >= NUM_PARENT_SUBACCOUNTS;
+          if (!isChildSubaccount) {
+            dispatch(setSubaccountForPostOrders(subaccountData));
           }
-        }
-
-        if (changes.has(Changes.fills)) {
-          const fills = updatedState.subaccountFills(subaccountId)?.toArray() ?? [];
-          if (isChildSubaccount) {
-            childSubaccountUpdate[subaccountId] = { ...childSubaccountUpdate[subaccountId], fills };
-          } else {
-            dispatch(setFills(fills));
-            dispatch(updateFilledOrders(fills));
-          }
-        }
-
-        if (changes.has(Changes.fundingPayments)) {
-          const fundingPayments =
-            updatedState.subaccountFundingPayments(subaccountId)?.toArray() ?? [];
-
-          if (isChildSubaccount) {
-            childSubaccountUpdate[subaccountId] = {
-              ...childSubaccountUpdate[subaccountId],
-              fundingPayments,
-            };
-          } else {
-            dispatch(setFundingPayments(fundingPayments));
-          }
-        }
-
-        if (changes.has(Changes.transfers)) {
-          const transfers = updatedState.subaccountTransfers(subaccountId)?.toArray() ?? [];
-
-          if (isChildSubaccount) {
-            childSubaccountUpdate[subaccountId] = {
-              ...childSubaccountUpdate[subaccountId],
-              transfers,
-            };
-          } else {
-            dispatch(setTransfers(transfers));
-          }
-        }
-
-        if (changes.has(Changes.historicalPnl)) {
-          const historicalPnl = updatedState.subaccountHistoricalPnl(subaccountId)?.toArray() ?? [];
-
-          if (isChildSubaccount) {
-            childSubaccountUpdate[subaccountId] = {
-              ...childSubaccountUpdate[subaccountId],
-              historicalPnl,
-            };
-          } else {
-            dispatch(setHistoricalPnl(historicalPnl));
-          }
-        }
-
-        if (isChildSubaccount) {
-          dispatch(setChildSubaccount(childSubaccountUpdate));
-        }
-      });
-
-      marketIds?.forEach((market: string) => {
-        if (changes.has(Changes.orderbook)) {
-          const orderbook = updatedState.marketOrderbook(market);
-
-          if (orderbook) {
-            dispatch(setOrderbook({ orderbook, marketId: market }));
-          }
-        }
-
-        if (changes.has(Changes.trades)) {
-          const trades = updatedState.marketTrades(market)?.toArray() ?? [];
-          dispatch(setLiveTrades({ trades, marketId: market }));
-        }
-
-        if (changes.has(Changes.historicalFundings)) {
-          const historicalFundings = updatedState.historicalFunding(market)?.toArray() ?? [];
-
-          dispatch(
-            setHistoricalFundings({
-              marketId: market,
-              historicalFundings,
-            })
-          );
         }
       });
     }
   }
 
-  lastOrderChanged(order: SubaccountOrder) {
-    this.store?.dispatch(setLatestOrder(order));
+  // this can be migrated when the trade/close position forms are migrated
+  lastOrderChanged(order: SubaccountOrder | null | undefined) {
+    this.store?.dispatch(
+      setLatestOrder(order == null ? order : { clientId: order.clientId, id: order.id })
+    );
   }
 
   errorsEmitted(errors: ParsingErrors) {
+    const arr = errors.toArray();
+
+    track(AnalyticsEvents.WebsocketParseError({ message: arr.map((a) => a.message).join(', ') }));
     // eslint-disable-next-line no-console
-    console.error('parse errors', errors.toArray());
+    console.error('parse errors', arr);
   }
 
-  apiStateChanged(apiState: AbacusApiState) {
-    this.store?.dispatch(setApiState(apiState));
-  }
+  apiStateChanged() {}
 
   setStore = (store: RootStore) => {
     this.store = store;
@@ -271,3 +95,19 @@ class AbacusStateNotifier implements AbacusStateNotificationProtocol {
 }
 
 export default AbacusStateNotifier;
+
+export class NoOpAbacusStateNotifier implements AbacusStateNotificationProtocol {
+  environmentsChanged(): void {}
+
+  notificationsChanged(): void {}
+
+  stateChanged(): void {}
+
+  lastOrderChanged() {}
+
+  errorsEmitted() {}
+
+  apiStateChanged() {}
+
+  setStore = () => {};
+}

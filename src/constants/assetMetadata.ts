@@ -1,28 +1,26 @@
-export type MetadataServiceInfoResponse = Record<
-  string,
-  {
-    name: string;
-    logo: string;
-    urls: {
-      website: string | null;
-      technical_doc: string | null;
-      cmc: string | null;
-    };
-    sector_tags: string[] | null;
-    exchanges: any[] | null;
-  }
->;
+export type MetadataServiceAssetInfo = {
+  name: string;
+  logo: string;
+  urls: {
+    website: string | null;
+    technical_doc: string | null;
+    cmc: string | null;
+  };
+  sector_tags: string[] | null;
+  exchanges: any[] | null;
+};
 
-export type MetadataServicePricesResponse = Record<
-  string,
-  {
-    price: number | null;
-    percent_change_24h: number | null;
-    volume_24h: number | null;
-    market_cap: number | null;
-    self_reported_market_cap: number | null;
-  }
->;
+export type MetadataServicePrice = {
+  price: number | null;
+  percent_change_24h: number | null;
+  volume_24h: number | null;
+  market_cap: number | null;
+  self_reported_market_cap: number | null;
+};
+
+export type MetadataServiceInfoResponse = Record<string, MetadataServiceAssetInfo>;
+
+export type MetadataServicePricesResponse = Record<string, MetadataServicePrice>;
 
 export type MetadataServiceCandlesResponse = Record<
   string,

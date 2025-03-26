@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 
+import { BonsaiHooks } from '@/bonsai/ontology';
 import { curveLinear } from '@visx/curve';
 import type { TooltipContextType } from '@visx/xychart';
 import { debounce, get } from 'lodash';
@@ -22,13 +23,10 @@ import { OutputType, formatNumberOutput } from '@/components/Output';
 import { ToggleGroup } from '@/components/ToggleGroup';
 import { TimeSeriesChart } from '@/components/visx/TimeSeriesChart';
 
-import {
-  getSubaccount,
-  getSubaccountHistoricalPnl,
-  getSubaccountId,
-} from '@/state/accountSelectors';
+import { getSubaccountId } from '@/state/accountInfoSelectors';
+import { getSubaccount } from '@/state/accountSelectors';
 import { useAppSelector } from '@/state/appTypes';
-import { getChartDotBackground } from '@/state/configsSelectors';
+import { getChartDotBackground } from '@/state/appUiConfigsSelectors';
 
 import abacusStateManager from '@/lib/abacus';
 import { formatRelativeTime } from '@/lib/dateTime';
@@ -47,7 +45,6 @@ export type PnlDatum = {
   subaccountId: number;
   equity: number;
   totalPnl: number;
-  netTransfers: number;
   createdAt: number;
 };
 
@@ -77,13 +74,13 @@ export const PnlChart = ({
   slotEmpty,
 }: PnlChartProps) => {
   const { isTablet } = useBreakpoints();
-  const { equity } = useAppSelector(getSubaccount, shallowEqual) ?? {};
+  const { equity: equityBn } = useAppSelector(getSubaccount, shallowEqual) ?? {};
   const now = useNow({ intervalMs: timeUnits.minute });
 
   const chartDotsBackground = useAppSelector(getChartDotBackground);
 
   // Chart data
-  const pnlData = useAppSelector(getSubaccountHistoricalPnl, shallowEqual);
+  const { data: pnlData } = BonsaiHooks.useParentSubaccountHistoricalPnls();
   const subaccountId = useAppSelector(getSubaccountId, shallowEqual);
 
   const [periodOptions, setPeriodOptions] = useState<HistoricalPnlPeriods[]>([
@@ -103,16 +100,16 @@ export const PnlChart = ({
 
   const lastPnlTick = pnlData?.[pnlData.length - 1];
 
+  const equity = equityBn?.toNumber();
   const data = useMemo(
     () =>
       lastPnlTick
         ? [
             ...pnlData,
-            equity?.current && {
+            equity && {
               createdAtMilliseconds: now,
-              netTransfers: lastPnlTick.netTransfers ?? 0,
-              equity: equity.current,
-              totalPnl: equity.current - (lastPnlTick.equity ?? 0) + (lastPnlTick.totalPnl ?? 0),
+              equity,
+              totalPnl: equity - (lastPnlTick.equity ?? 0) + (lastPnlTick.totalPnl ?? 0),
             },
           ]
             .filter(isTruthy)
@@ -122,7 +119,6 @@ export const PnlChart = ({
                 subaccountId: subaccountId ?? 0,
                 equity: Number(datum.equity),
                 totalPnl: Number(datum.totalPnl),
-                netTransfers: Number(datum.netTransfers),
                 createdAt: new Date(datum.createdAtMilliseconds).valueOf(),
                 side: {
                   [-1]: PnlSide.Loss,
@@ -132,13 +128,13 @@ export const PnlChart = ({
               })
             )
         : [],
-    [pnlData, equity?.current, now, lastPnlTick, subaccountId]
+    [pnlData, equity, now, lastPnlTick, subaccountId]
   );
 
   const msForPeriod = useCallback(
     (period: HistoricalPnlPeriods, clampMax: Boolean = true) => {
-      const earliestCreatedAt = data?.[0]?.createdAt;
-      const latestCreatedAt = data?.[data.length - 1]?.createdAt;
+      const earliestCreatedAt = data[0]?.createdAt;
+      const latestCreatedAt = data[data.length - 1]?.createdAt;
       const maxPeriod =
         earliestCreatedAt && latestCreatedAt
           ? latestCreatedAt - earliestCreatedAt
@@ -174,7 +170,7 @@ export const PnlChart = ({
             setIsZooming(true);
           } else {
             setIsZooming(false);
-            setSelectedPeriod(periodOptions[defaultPeriodIx]);
+            setSelectedPeriod(periodOptions[defaultPeriodIx]!);
           }
         }
       }, NORMAL_DEBOUNCE_MS),
@@ -209,13 +205,16 @@ export const PnlChart = ({
     if (oldestPnlCreatedAt) {
       const options = getPeriodOptions(oldestPnlCreatedAt);
       setPeriodOptions(options);
-
-      // default to show 7d period if there's enough data
-      if (options.includes(HistoricalPnlPeriod.Period7d)) {
-        setSelectedPeriod(HistoricalPnlPeriod.Period7d);
-      }
     }
   }, [oldestPnlCreatedAt, getPeriodOptions]);
+
+  useEffect(() => {
+    // default to show 7d period if there's enough data
+    if (periodOptions.includes(HistoricalPnlPeriod.Period7d)) {
+      setSelectedPeriod(HistoricalPnlPeriod.Period7d);
+      setIsZooming(false);
+    }
+  }, [periodOptions.includes(HistoricalPnlPeriod.Period7d)]);
 
   const chartStyles = useMemo(
     () => ({
@@ -236,8 +235,8 @@ export const PnlChart = ({
     [chartDotsBackground, isTablet]
   );
 
-  const xAccessorFunc = useCallback((datum: PnlDatum) => datum?.createdAt, []);
-  const yAccessorFunc = useCallback((datum: PnlDatum) => datum?.equity, []);
+  const xAccessorFunc = useCallback((datum: PnlDatum | undefined) => datum?.createdAt ?? 0, []);
+  const yAccessorFunc = useCallback((datum: PnlDatum | undefined) => datum?.equity ?? 0, []);
 
   const series = useMemo(
     () => [

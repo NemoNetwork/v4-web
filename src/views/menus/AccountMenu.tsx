@@ -1,6 +1,7 @@
 import { ElementType, memo } from 'react';
 
 import { useMfaEnrollment, usePrivy } from '@privy-io/react-auth';
+import { Item } from '@radix-ui/react-dropdown-menu';
 import type { Dispatch } from '@reduxjs/toolkit';
 import { shallowEqual } from 'react-redux';
 import styled, { css } from 'styled-components';
@@ -48,12 +49,13 @@ import { OnboardingTriggerButton } from '@/views/dialogs/OnboardingTriggerButton
 
 import { getOnboardingState, getSubaccount } from '@/state/accountSelectors';
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
-import { AppTheme } from '@/state/configs';
-import { getAppTheme } from '@/state/configsSelectors';
+import { AppTheme } from '@/state/appUiConfigs';
+import { getAppTheme } from '@/state/appUiConfigsSelectors';
 import { openDialog } from '@/state/dialogs';
 
 import { isTruthy } from '@/lib/isTruthy';
 import { MustBigNumber } from '@/lib/numbers';
+import { testFlags } from '@/lib/testFlags';
 import { truncateAddress } from '@/lib/wallet';
 
 import { MobileDownloadLinks } from '../MobileDownloadLinks';
@@ -71,7 +73,7 @@ export const AccountMenu = () => {
 
   const { nativeTokenBalance, usdcBalance } = useAccountBalance();
 
-  const { usdcLabel, chainTokenLabel } = useTokenConfigs();
+  const { usdcImage, usdcLabel, chainTokenImage, chainTokenLabel } = useTokenConfigs();
   const theme = useAppSelector(getAppTheme);
 
   const {
@@ -89,7 +91,7 @@ export const AccountMenu = () => {
   }
 
   const privy = usePrivy();
-  const { google, discord, twitter } = privy?.user ?? {};
+  const { google, discord, twitter } = privy.user ?? {};
 
   const { showMfaEnrollmentModal } = useMfaEnrollment();
 
@@ -130,13 +132,18 @@ export const AccountMenu = () => {
     <OnboardingTriggerButton size={ButtonSize.XSmall} />
   ) : (
     <$DropdownMenu
+      modal={false}
       slotTopContent={
         onboardingState === OnboardingState.AccountConnected && (
           <div tw="flexColumn gap-1 px-1 pb-0.5 pt-1">
             <$AddressRow>
-              <AssetIcon symbol="DYDX" tw="z-[2] text-[1.75rem]" />
+              <AssetIcon
+                logoUrl={chainTokenImage}
+                symbol={chainTokenLabel}
+                tw="z-[2] [--asset-icon-size:1.75rem]"
+              />
               <$Column>
-                {walletInfo && walletInfo?.name !== WalletType.Keplr ? (
+                {walletInfo && walletInfo.name !== WalletType.Keplr ? (
                   <DydxDerivedAddress address={address} />
                 ) : (
                   <$label>{stringGetter({ key: STRING_KEYS.DYDX_CHAIN_ADDRESS })}</$label>
@@ -179,7 +186,7 @@ export const AccountMenu = () => {
                       key: STRING_KEYS.ASSET_BALANCE,
                       params: { ASSET: chainTokenLabel },
                     })}
-                    <AssetIcon symbol={chainTokenLabel} />
+                    <AssetIcon logoUrl={chainTokenImage} symbol={chainTokenLabel} />
                   </$label>
                   <$BalanceOutput type={OutputType.Asset} value={nativeTokenBalance} />
                 </div>
@@ -199,7 +206,7 @@ export const AccountMenu = () => {
                         key: STRING_KEYS.WALLET_BALANCE,
                         params: { ASSET: usdcLabel },
                       })}
-                      <AssetIcon symbol="USDC" />
+                      <AssetIcon logoUrl={usdcImage} symbol="USDC" />
                     </$label>
                     <$BalanceOutput
                       type={OutputType.Asset}
@@ -216,11 +223,11 @@ export const AccountMenu = () => {
                       key: STRING_KEYS.ASSET_BALANCE,
                       params: { ASSET: usdcLabel },
                     })}
-                    <AssetIcon symbol="USDC" />
+                    <AssetIcon logoUrl={usdcImage} symbol="USDC" />
                   </$label>
                   <$BalanceOutput
                     type={OutputType.Asset}
-                    value={freeCollateral?.current ?? 0}
+                    value={freeCollateral ?? 0}
                     fractionDigits={USD_DECIMALS}
                   />
                 </div>
@@ -228,7 +235,7 @@ export const AccountMenu = () => {
                   asset={DydxChainAsset.USDC}
                   complianceState={complianceState}
                   dispatch={dispatch}
-                  hasBalance={MustBigNumber(freeCollateral?.current).gt(0)}
+                  hasBalance={MustBigNumber(freeCollateral).gt(0)}
                   stringGetter={stringGetter}
                   withOnboarding
                 />
@@ -447,47 +454,60 @@ const AssetActions = memo(
     withOnboarding?: boolean;
     hasBalance?: boolean;
     stringGetter: StringGetterFunction;
-  }) => (
-    <div tw="inlineRow">
-      {[
-        withOnboarding &&
-          complianceState === ComplianceStates.FULL_ACCESS && {
-            dialog: DialogTypes.Deposit(),
-            iconName: IconName.Deposit,
-            tooltipStringKey: STRING_KEYS.DEPOSIT,
-          },
-        withOnboarding &&
-          hasBalance && {
-            dialog: DialogTypes.Withdraw(),
-            iconName: IconName.Withdraw,
-            tooltipStringKey: STRING_KEYS.WITHDRAW,
-          },
-        hasBalance &&
-          complianceState === ComplianceStates.FULL_ACCESS && {
-            dialog: DialogTypes.Transfer({ selectedAsset: asset }),
-            iconName: IconName.Send,
-            tooltipStringKey: STRING_KEYS.TRANSFER,
-          },
-      ]
-        .filter(isTruthy)
-        .map(({ iconName, tooltipStringKey, dialog }) => (
-          <WithTooltip
-            key={tooltipStringKey}
-            tooltipString={stringGetter({ key: tooltipStringKey })}
-            tw="[--tooltip-backgroundColor:--color-layer-5]"
-          >
-            <$IconButton
-              key={dialog.type}
-              action={ButtonAction.Base}
-              shape={ButtonShape.Square}
-              iconName={iconName}
-              onClick={() => dispatch(openDialog(dialog))}
-            />
-          </WithTooltip>
-        ))}
-    </div>
-  )
+  }) => {
+    const showNewDepositFlow =
+      useStatsigGateValue(StatsigFlags.ffDepositRewrite) || testFlags.showNewDepositFlow;
+    const showNewWithdrawFlow =
+      useStatsigGateValue(StatsigFlags.ffWithdrawRewrite) || testFlags.showNewWithdrawFlow;
+
+    return (
+      <div tw="inlineRow">
+        {[
+          withOnboarding &&
+            complianceState === ComplianceStates.FULL_ACCESS && {
+              dialog: showNewDepositFlow ? DialogTypes.Deposit2({}) : DialogTypes.Deposit({}),
+              iconName: IconName.Deposit,
+              tooltipStringKey: STRING_KEYS.DEPOSIT,
+            },
+          withOnboarding &&
+            hasBalance && {
+              dialog: showNewWithdrawFlow ? DialogTypes.Withdraw2({}) : DialogTypes.Withdraw({}),
+              iconName: IconName.Withdraw,
+              tooltipStringKey: STRING_KEYS.WITHDRAW,
+            },
+          hasBalance &&
+            complianceState === ComplianceStates.FULL_ACCESS && {
+              dialog: DialogTypes.Transfer({ selectedAsset: asset }),
+              iconName: IconName.Send,
+              tooltipStringKey: STRING_KEYS.TRANSFER,
+            },
+        ]
+          .filter(isTruthy)
+          .map(({ iconName, tooltipStringKey, dialog }) => (
+            <Item key={tooltipStringKey}>
+              {/* Need to wrap in Item to enable 'dismiss dropdown on click' functionality
+          In general, any CTA in a dropdown should be wrapped in an Item tag
+       */}
+              <WithTooltip
+                key={tooltipStringKey}
+                tooltipString={stringGetter({ key: tooltipStringKey })}
+                tw="[--tooltip-backgroundColor:--color-layer-5]"
+              >
+                <$IconButton
+                  key={dialog.type}
+                  action={ButtonAction.Base}
+                  shape={ButtonShape.Square}
+                  iconName={iconName}
+                  onClick={() => dispatch(openDialog(dialog))}
+                />
+              </WithTooltip>
+            </Item>
+          ))}
+      </div>
+    );
+  }
 );
+
 const $Column = styled.div`
   ${layoutMixins.column}
 `;
@@ -507,9 +527,7 @@ const $label = styled.div`
   font-size: var(--fontSize-mini);
   color: var(--color-text-0);
 
-  img {
-    font-size: 1rem;
-  }
+  --asset-icon-size: 1rem;
 `;
 
 const $Balances = styled.div`

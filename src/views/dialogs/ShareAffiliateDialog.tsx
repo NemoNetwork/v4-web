@@ -1,8 +1,15 @@
+import { useEffect } from 'react';
+
 import { useToBlob } from '@hugocxl/react-to-image';
 import styled from 'styled-components';
 
-import { AFFILIATES_EARN_PER_MONTH, AFFILIATES_FEE_DISCOUNT } from '@/constants/affiliates';
-import { ButtonAction, ButtonSize } from '@/constants/buttons';
+import {
+  AFFILIATES_FEE_DISCOUNT_USD,
+  AFFILIATES_REQUIRED_VOLUME_USD,
+  DEFAULT_AFFILIATES_EARN_PER_MONTH_USD,
+} from '@/constants/affiliates';
+import { AnalyticsEvents } from '@/constants/analytics';
+import { ButtonAction, ButtonSize, ButtonType } from '@/constants/buttons';
 import { DialogProps, ShareAffiliateDialogProps } from '@/constants/dialogs';
 import { STRING_KEYS } from '@/constants/localization';
 import { ColorToken } from '@/constants/styles/base';
@@ -19,7 +26,11 @@ import { Icon, IconName } from '@/components/Icon';
 import { Link } from '@/components/Link';
 import { QrCode } from '@/components/QrCode';
 
+import { track } from '@/lib/analytics/analytics';
 import { triggerTwitterIntent } from '@/lib/twitter';
+
+import { AffiliateProgress } from '../Affiliates/AffiliateProgress';
+import { OnboardingTriggerButton } from './OnboardingTriggerButton';
 
 const copyBlobToClipboard = async (blob: Blob | null) => {
   if (!blob) {
@@ -32,9 +43,22 @@ const copyBlobToClipboard = async (blob: Blob | null) => {
 
 export const ShareAffiliateDialog = ({ setIsOpen }: DialogProps<ShareAffiliateDialogProps>) => {
   const stringGetter = useStringGetter();
-  const { affiliateProgram } = useURLConfigs();
+  const { affiliateProgramFaq, affiliateProgram } = useURLConfigs();
   const { dydxAddress } = useAccounts();
-  const { data } = useAffiliatesInfo(dydxAddress as string);
+  const {
+    affiliateMetadataQuery: { data },
+    affiliateMaxEarningQuery: { data: maxEarningData },
+  } = useAffiliatesInfo(dydxAddress);
+
+  useEffect(() => {
+    if (data?.isEligible === undefined) return;
+
+    track(
+      AnalyticsEvents.AffiliateInviteFriendsModalOpened({ isAffiliateEligible: data.isEligible })
+    );
+  }, [data?.isEligible]);
+
+  const maxEarning = maxEarningData?.maxEarning;
 
   const [{ isLoading: isCopying }, , ref] = useToBlob<HTMLDivElement>({
     quality: 1.0,
@@ -50,7 +74,7 @@ export const ShareAffiliateDialog = ({ setIsOpen }: DialogProps<ShareAffiliateDi
         text: `${stringGetter({
           key: STRING_KEYS.TWEET_SHARE_AFFILIATES,
           params: {
-            AMOUNT_USD: AFFILIATES_FEE_DISCOUNT,
+            AMOUNT_USD: AFFILIATES_FEE_DISCOUNT_USD.toLocaleString(),
           },
         })}\n\n${affiliatesUrl}\n\n#dYdX \n[${stringGetter({ key: STRING_KEYS.TWEET_PASTE_IMAGE_AND_DELETE_THIS })}]`,
         related: 'dYdX',
@@ -58,105 +82,119 @@ export const ShareAffiliateDialog = ({ setIsOpen }: DialogProps<ShareAffiliateDi
     },
   });
 
-  const affiliatesUrl = `${window.location.host}?ref=${data?.metadata?.referralCode}`;
+  const affiliatesUrl =
+    data?.metadata?.referralCode && `${window.location.host}?ref=${data.metadata.referralCode}`;
+
+  const dialogDescription = (
+    <span>
+      {!data?.isEligible
+        ? stringGetter({
+            key: STRING_KEYS.AFFILIATE_PROGRAM_TRADING_REQUIREMENT,
+            params: {
+              AMOUNT_USD: AFFILIATES_REQUIRED_VOLUME_USD.toLocaleString(),
+            },
+          })
+        : stringGetter({
+            key: STRING_KEYS.EARN_FOR_EACH_TRADER,
+            params: {
+              AMOUNT_USD:
+                maxEarning?.toLocaleString() ??
+                DEFAULT_AFFILIATES_EARN_PER_MONTH_USD.toLocaleString(),
+            },
+          })}{' '}
+      <Link href={affiliateProgramFaq} isInline>
+        {stringGetter({ key: STRING_KEYS.LEARN_MORE })} →
+      </Link>
+    </span>
+  );
 
   return (
     <Dialog
       isOpen
       setIsOpen={setIsOpen}
-      title={stringGetter({ key: STRING_KEYS.INVITE_FRIENDS })}
-      description={stringGetter({
-        key: STRING_KEYS.EARCH_FOR_EACH_TRADER_REFER_FOR_DISCOUNTS,
-        params: {
-          AMOUNT_DISCOUNT: AFFILIATES_FEE_DISCOUNT,
-          VIP_AMOUNT_USD: AFFILIATES_EARN_PER_MONTH,
-          AMOUNT_PER_MONTH: AFFILIATES_EARN_PER_MONTH,
-          LEARN_MORE_LINK: (
-            <Link href={affiliateProgram} isInline>
-              {stringGetter({ key: STRING_KEYS.LEARN_MORE })} →
-            </Link>
-          ),
-        },
-      })}
+      title={stringGetter({ key: STRING_KEYS.UNLOCK_AFFILIATE_PROGRAM })}
+      description={dialogDescription}
     >
-      <div tw="column gap-1">
-        <div tw="row justify-between rounded-0.5 bg-color-layer-6 px-1 py-0.5">
-          <div>
-            <div tw="text-small text-color-text-0">
-              {data?.isEligible
-                ? stringGetter({ key: STRING_KEYS.AFFILIATE_LINK })
-                : stringGetter({
-                    key: STRING_KEYS.AFFILIATE_LINK_REQUIREMENT,
-                    params: {
-                      // TODO: make this configurable or get from API
-                      AMOUNT_USD: '10K',
-                    },
-                  })}
-            </div>
-            <div>
-              {data?.isEligible
-                ? affiliatesUrl
-                : stringGetter({
-                    key: STRING_KEYS.YOUVE_TRADED,
-                    params: {
-                      // TODO: get the actual amount from the API
-                      AMOUNT_USD: '5K',
-                    },
-                  })}
-            </div>
-          </div>
-          {data?.isEligible && (
-            <CopyButton action={ButtonAction.Primary} size={ButtonSize.Small} value={affiliatesUrl}>
-              {stringGetter({ key: STRING_KEYS.COPY_LINK })}
-            </CopyButton>
-          )}
-        </div>
-        <div
-          ref={(domNode) => {
-            if (domNode) {
-              ref(domNode);
-              refShare(domNode);
-            }
+      {!dydxAddress && (
+        <OnboardingTriggerButton
+          tw="w-full"
+          size={ButtonSize.Medium}
+          onClick={() => {
+            setIsOpen(false);
           }}
-          tw="relative"
-        >
-          <img src="/affiliates-share.png" alt="share affiliates" tw="w-full rounded-1" />
-          <$QrCode
-            size={68}
-            options={{
-              margin: 0,
-              backgroundOptions: {
-                color: ColorToken.White,
-              },
-              dotsOptions: {
-                type: 'dots',
-                color: ColorToken.DarkGray13,
-              },
-              cornersSquareOptions: {
-                type: 'extra-rounded',
-                color: ColorToken.DarkGray13,
-              },
-              imageOptions: {
-                margin: 0,
-              },
-            }}
-            value={affiliatesUrl}
-          />
-        </div>
+        />
+      )}
+      {dydxAddress && !data?.isEligible && <AffiliateProgress volume={data?.totalVolume} />}
+      {dydxAddress && data?.isEligible && (
+        <div tw="column gap-1">
+          <div tw="row justify-between rounded-0.5 bg-color-layer-6 px-1 py-0.5">
+            <div>
+              <div tw="text-small text-color-text-0">
+                {stringGetter({ key: STRING_KEYS.AFFILIATE_LINK })}
+              </div>
+              <div>{affiliatesUrl}</div>
+            </div>
+            {affiliatesUrl && (
+              <CopyButton
+                action={ButtonAction.Primary}
+                size={ButtonSize.Small}
+                value={affiliatesUrl}
+                onCopy={() => {
+                  track(AnalyticsEvents.AffiliateURLCopied({ url: affiliatesUrl }));
+                }}
+              >
+                {stringGetter({ key: STRING_KEYS.COPY_LINK })}
+              </CopyButton>
+            )}
+          </div>
+          {affiliatesUrl && (
+            <div
+              ref={(domNode) => {
+                if (domNode) {
+                  ref(domNode);
+                  refShare(domNode);
+                }
+              }}
+              tw="relative"
+            >
+              <img src="/affiliates-share.png" alt="share affiliates" tw="w-full rounded-1" />
+              <$QrCode
+                size={68}
+                options={{
+                  margin: 0,
+                  backgroundOptions: {
+                    color: ColorToken.White,
+                  },
+                  dotsOptions: {
+                    type: 'dots',
+                    color: ColorToken.DarkGray13,
+                  },
+                  cornersSquareOptions: {
+                    type: 'extra-rounded',
+                    color: ColorToken.DarkGray13,
+                  },
+                  imageOptions: {
+                    margin: 0,
+                  },
+                }}
+                value={affiliatesUrl}
+              />
+            </div>
+          )}
 
-        <div tw="flex gap-1">
-          <Button
-            action={data?.isEligible ? ButtonAction.Base : ButtonAction.Primary}
-            slotLeft={<Icon iconName={IconName.Rocket} />}
-            state={{
-              isLoading: isCopying,
-            }}
-            tw="flex-1"
-            href={affiliateProgram}
-          >
-            {stringGetter({ key: STRING_KEYS.BECOME_A_VIP })}
-          </Button>
-          {data?.isEligible && (
+          <div tw="flex gap-1">
+            <Button
+              action={ButtonAction.Base}
+              slotLeft={<Icon iconName={IconName.Rocket} />}
+              state={{
+                isLoading: isCopying,
+              }}
+              tw="flex-1"
+              type={ButtonType.Link}
+              href={affiliateProgram}
+            >
+              {stringGetter({ key: STRING_KEYS.BECOME_A_VIP })}
+            </Button>
             <Button
               action={ButtonAction.Base}
               slotLeft={<Icon iconName={IconName.SocialX} />}
@@ -170,9 +208,9 @@ export const ShareAffiliateDialog = ({ setIsOpen }: DialogProps<ShareAffiliateDi
             >
               {stringGetter({ key: STRING_KEYS.SHARE })}
             </Button>
-          )}
+          </div>
         </div>
-      </div>
+      )}
     </Dialog>
   );
 };

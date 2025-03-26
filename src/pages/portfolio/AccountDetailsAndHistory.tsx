@@ -22,13 +22,11 @@ import { TermsOfUseLink } from '@/components/TermsOfUseLink';
 import { TriangleIndicator } from '@/components/TriangleIndicator';
 import { WithLabel } from '@/components/WithLabel';
 import { PnlChart, type PnlDatum } from '@/views/charts/PnlChart';
-import { OnboardingTriggerButton } from '@/views/dialogs/OnboardingTriggerButton';
 
 import { getOnboardingState, getSubaccount } from '@/state/accountSelectors';
 import { useAppSelector } from '@/state/appTypes';
 import { getSelectedLocale } from '@/state/localizationSelectors';
 
-import { isTruthy } from '@/lib/isTruthy';
 import { MustBigNumber } from '@/lib/numbers';
 import { orEmptyObj } from '@/lib/typeUtils';
 
@@ -61,7 +59,7 @@ const usePortfolioValues = ({
   );
 
   const earliestVisibleDatum = visibleData?.[0];
-  const latestVisibleDatum = visibleData?.[(visibleData?.length ?? 1) - 1];
+  const latestVisibleDatum = visibleData?.[visibleData.length - 1];
 
   const pnl = useMemo(() => {
     let pnlDiff;
@@ -109,7 +107,7 @@ export const AccountDetailsAndHistory = () => {
 
   const { accountValueLabel, accountEquity, pnlDiff, pnlDiffPercent, pnlDiffSign } =
     usePortfolioValues({
-      equity: equity?.current,
+      equity: equity?.toNumber(),
       activeDatum: tooltipContext?.tooltipData?.nearestDatum?.datum,
       visibleData,
     });
@@ -119,15 +117,15 @@ export const AccountDetailsAndHistory = () => {
       key: 'MarginUsage',
       labelKey: STRING_KEYS.MARGIN_USAGE,
       type: OutputType.Percent,
-      value: marginUsage?.current,
+      value: marginUsage?.toNumber(),
     },
     {
       key: 'Leverage',
       labelKey: STRING_KEYS.LEVERAGE,
       type: OutputType.Multiple,
-      value: leverage?.current,
+      value: leverage?.toNumber(),
     },
-  ].filter(isTruthy);
+  ];
 
   return (
     <$AccountDetailsAndHistory>
@@ -185,7 +183,6 @@ export const AccountDetailsAndHistory = () => {
                     }[onboardingState],
                   })}
                 </p>
-                <OnboardingTriggerButton />
               </$EmptyCard>
             ) : null}
           </div>

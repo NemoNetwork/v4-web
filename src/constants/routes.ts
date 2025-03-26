@@ -10,7 +10,7 @@ export enum AppRoute {
   Settings = '/settings',
   Terms = '/terms',
   Privacy = '/privacy',
-  LaunchMarket = '/launch-market',
+  Referrals = '/referrals',
 }
 
 export enum MarketsRoute {
@@ -35,8 +35,9 @@ export enum HistoryRoute {
 
 export enum MobileSettingsRoute {
   Language = 'language',
-  Notifications = 'notifications',
+  Preferences = 'preferences',
   Network = 'network',
+  Display = 'display',
 }
 
 export const BASE_ROUTE = import.meta.env.VITE_ROUTER_TYPE === 'hash' ? '/#' : '';

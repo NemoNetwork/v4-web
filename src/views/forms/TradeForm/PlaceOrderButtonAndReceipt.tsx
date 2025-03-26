@@ -1,16 +1,30 @@
-import { shallowEqual } from 'react-redux';
+import { useState } from 'react';
 
-import { AbacusInputTypes, AbacusMarginMode, type TradeInputSummary } from '@/constants/abacus';
-import { ButtonAction, ButtonSize, ButtonType } from '@/constants/buttons';
+import { BonsaiHelpers } from '@/bonsai/ontology';
+import { shallowEqual } from 'react-redux';
+import styled from 'styled-components';
+
+import {
+  AbacusInputTypes,
+  AbacusMarginMode,
+  AbacusPositionSide,
+  type TradeInputSummary,
+} from '@/constants/abacus';
+import { ButtonAction, ButtonShape, ButtonSize, ButtonType } from '@/constants/buttons';
 import { ComplianceStates } from '@/constants/compliance';
 import { DialogTypes } from '@/constants/dialogs';
 import { STRING_KEYS } from '@/constants/localization';
+import { StatsigFlags } from '@/constants/statsig';
 import { MobilePlaceOrderSteps, TradeTypes } from '@/constants/trade';
 
 import { ConnectionErrorType, useApiState } from '@/hooks/useApiState';
 import { useComplianceState } from '@/hooks/useComplianceState';
+import { useStatsigGateValue } from '@/hooks/useStatsig';
 import { useStringGetter } from '@/hooks/useStringGetter';
 import { useTokenConfigs } from '@/hooks/useTokenConfigs';
+
+import { formMixins } from '@/styles/formMixins';
+import { layoutMixins } from '@/styles/layoutMixins';
 
 import { AssetIcon } from '@/components/AssetIcon';
 import { Button } from '@/components/Button';
@@ -18,23 +32,27 @@ import { DetailsItem } from '@/components/Details';
 import { DiffOutput } from '@/components/DiffOutput';
 import { Icon, IconName } from '@/components/Icon';
 import { Output, OutputType, ShowSign } from '@/components/Output';
+import { WithSeparators } from '@/components/Separator';
+import { ToggleButton } from '@/components/ToggleButton';
 import { WithDetailsReceipt } from '@/components/WithDetailsReceipt';
 import { WithTooltip } from '@/components/WithTooltip';
 import { OnboardingTriggerButton } from '@/views/dialogs/OnboardingTriggerButton';
 
 import { calculateCanAccountTrade } from '@/state/accountCalculators';
-import { getCurrentMarketPositionData, getSubaccountId } from '@/state/accountSelectors';
+import { getSubaccountId } from '@/state/accountInfoSelectors';
+import {
+  getCurrentMarketPositionData,
+  getCurrentMarketPositionDataForPostTrade,
+} from '@/state/accountSelectors';
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
 import { openDialog } from '@/state/dialogs';
 import { getCurrentInput, getInputTradeMarginMode } from '@/state/inputsSelectors';
-import { getCurrentMarketConfig } from '@/state/perpetualsSelectors';
 
+import { getDisplayableAssetFromBaseAsset } from '@/lib/assetUtils';
 import { isTruthy } from '@/lib/isTruthy';
 import { nullIfZero } from '@/lib/numbers';
-import {
-  calculateCrossPositionMargin,
-  getTradeStateWithDoubleValuesHasDiff,
-} from '@/lib/tradeData';
+import { testFlags } from '@/lib/testFlags';
+import { calculateCrossPositionMargin, getDoubleValuesHasDiff } from '@/lib/tradeData';
 import { orEmptyObj } from '@/lib/typeUtils';
 
 import { useTradeTypeOptions } from './useTradeTypeOptions';
@@ -48,25 +66,29 @@ type ConfirmButtonConfig = {
 type ElementProps = {
   actionStringKey?: string;
   summary?: TradeInputSummary;
+  hasInput: boolean;
   hasValidationErrors?: boolean;
   validationErrorString?: string;
   currentStep?: MobilePlaceOrderSteps;
   showDeposit?: boolean;
   confirmButtonConfig: ConfirmButtonConfig;
+  onClearInputs: () => void;
 };
 
 export const PlaceOrderButtonAndReceipt = ({
   actionStringKey,
   summary,
+  hasInput,
   hasValidationErrors,
   validationErrorString,
   currentStep,
   showDeposit,
   confirmButtonConfig,
+  onClearInputs,
 }: ElementProps) => {
   const stringGetter = useStringGetter();
   const dispatch = useAppDispatch();
-  const { chainTokenLabel } = useTokenConfigs();
+  const { chainTokenImage, chainTokenLabel } = useTokenConfigs();
   const { connectionError } = useApiState();
   const { complianceState } = useComplianceState();
   const { selectedTradeType } = useTradeTypeOptions();
@@ -74,12 +96,29 @@ export const PlaceOrderButtonAndReceipt = ({
   const canAccountTrade = useAppSelector(calculateCanAccountTrade);
   const subaccountNumber = useAppSelector(getSubaccountId);
   const currentInput = useAppSelector(getCurrentInput);
-  const { tickSizeDecimals } = orEmptyObj(useAppSelector(getCurrentMarketConfig, shallowEqual));
-  const { liquidationPrice, equity, leverage, notionalTotal, adjustedImf } = orEmptyObj(
-    useAppSelector(getCurrentMarketPositionData, shallowEqual)
+
+  const showNewDepositFlow =
+    useStatsigGateValue(StatsigFlags.ffDepositRewrite) || testFlags.showNewDepositFlow;
+
+  const id = useAppSelector(BonsaiHelpers.currentMarket.assetId);
+  const { tickSizeDecimals } = orEmptyObj(
+    useAppSelector(BonsaiHelpers.currentMarket.stableMarketInfo)
+  );
+  const {
+    liquidationPrice,
+    leverage,
+    notional: notionalTotal,
+    adjustedImf,
+    marginValueMaintenance: equity,
+  } = orEmptyObj(useAppSelector(getCurrentMarketPositionData, shallowEqual));
+
+  const postOrderPositionData = orEmptyObj(
+    useAppSelector(getCurrentMarketPositionDataForPostTrade, shallowEqual)
   );
 
   const marginMode = useAppSelector(getInputTradeMarginMode, shallowEqual);
+
+  const [isReceiptOpen, setIsReceiptOpen] = useState(true);
 
   const hasMissingData = subaccountNumber === undefined;
 
@@ -109,15 +148,15 @@ export const PlaceOrderButtonAndReceipt = ({
     if (marginMode === AbacusMarginMode.Cross) {
       const currentCrossMargin = nullIfZero(
         calculateCrossPositionMargin({
-          notionalTotal: notionalTotal?.current,
-          adjustedImf: adjustedImf?.current,
+          notionalTotal: notionalTotal?.toNumber(),
+          adjustedImf: adjustedImf?.toNumber(),
         })
       );
 
       const postOrderCrossMargin = nullIfZero(
         calculateCrossPositionMargin({
-          notionalTotal: notionalTotal?.postOrder,
-          adjustedImf: adjustedImf?.postOrder,
+          notionalTotal: postOrderPositionData.notionalTotal?.postOrder,
+          adjustedImf: postOrderPositionData.adjustedImf?.postOrder,
         })
       );
 
@@ -136,9 +175,12 @@ export const PlaceOrderButtonAndReceipt = ({
       <DiffOutput
         useGrouping
         type={OutputType.Fiat}
-        value={equity?.current}
-        newValue={equity?.postOrder}
-        withDiff={areInputsFilled && getTradeStateWithDoubleValuesHasDiff(equity)}
+        value={equity}
+        newValue={postOrderPositionData.equity?.postOrder}
+        withDiff={
+          areInputsFilled &&
+          getDoubleValuesHasDiff(equity?.toNumber(), postOrderPositionData.equity?.postOrder)
+        }
       />
     );
   };
@@ -163,33 +205,65 @@ export const PlaceOrderButtonAndReceipt = ({
       },
       {
         key: 'liquidation-price',
-        label: stringGetter({ key: STRING_KEYS.LIQUIDATION_PRICE }),
+        label: (
+          <WithTooltip
+            tooltip={
+              postOrderPositionData.side?.postOrder === AbacusPositionSide.SHORT
+                ? 'liquidation-price-short'
+                : 'liquidation-price-long'
+            }
+            stringParams={{ SYMBOL: getDisplayableAssetFromBaseAsset(id) }}
+            side="right"
+          >
+            {stringGetter({ key: STRING_KEYS.LIQUIDATION_PRICE })}
+          </WithTooltip>
+        ),
         value: (
           <DiffOutput
             useGrouping
             type={OutputType.Fiat}
             fractionDigits={tickSizeDecimals}
-            value={liquidationPrice?.current}
-            newValue={liquidationPrice?.postOrder}
-            withDiff={areInputsFilled && getTradeStateWithDoubleValuesHasDiff(liquidationPrice)}
+            value={liquidationPrice}
+            newValue={postOrderPositionData.liquidationPrice?.postOrder}
+            withDiff={
+              areInputsFilled &&
+              getDoubleValuesHasDiff(
+                liquidationPrice?.toNumber(),
+                postOrderPositionData.liquidationPrice?.postOrder
+              )
+            }
           />
         ),
       },
       {
         key: 'position-margin',
-        label: stringGetter({ key: STRING_KEYS.POSITION_MARGIN }),
+        label: (
+          <WithTooltip tooltip="position-margin" side="right">
+            {stringGetter({ key: STRING_KEYS.POSITION_MARGIN })}
+          </WithTooltip>
+        ),
         value: renderMarginValue(),
       },
       {
         key: 'position-leverage',
-        label: stringGetter({ key: STRING_KEYS.POSITION_LEVERAGE }),
+        label: (
+          <WithTooltip tooltip="position-leverage" side="right">
+            {stringGetter({ key: STRING_KEYS.POSITION_LEVERAGE })}
+          </WithTooltip>
+        ),
         value: (
           <DiffOutput
             useGrouping
             type={OutputType.Multiple}
-            value={nullIfZero(leverage?.current)}
-            newValue={leverage?.postOrder}
-            withDiff={areInputsFilled && getTradeStateWithDoubleValuesHasDiff(leverage)}
+            value={nullIfZero(leverage?.toNumber())}
+            newValue={postOrderPositionData.leverage?.postOrder}
+            withDiff={
+              areInputsFilled &&
+              getDoubleValuesHasDiff(
+                leverage?.toNumber(),
+                postOrderPositionData.leverage?.postOrder
+              )
+            }
             showSign={ShowSign.None}
           />
         ),
@@ -208,7 +282,7 @@ export const PlaceOrderButtonAndReceipt = ({
         label: (
           <>
             {stringGetter({ key: STRING_KEYS.MAXIMUM_REWARDS })}
-            <AssetIcon symbol={chainTokenLabel} />
+            <AssetIcon logoUrl={chainTokenImage} symbol={chainTokenLabel} />
           </>
         ),
         value: (
@@ -277,7 +351,11 @@ export const PlaceOrderButtonAndReceipt = ({
   const depositButton = (
     <Button
       action={ButtonAction.Primary}
-      onClick={() => dispatch(openDialog(DialogTypes.Deposit()))}
+      onClick={() =>
+        dispatch(
+          openDialog(showNewDepositFlow ? DialogTypes.Deposit2({}) : DialogTypes.Deposit({}))
+        )
+      }
     >
       {stringGetter({ key: STRING_KEYS.DEPOSIT_FUNDS })}
     </Button>
@@ -310,16 +388,72 @@ export const PlaceOrderButtonAndReceipt = ({
   );
 
   return (
-    <WithDetailsReceipt detailItems={items}>
-      {!canAccountTrade ? (
-        <OnboardingTriggerButton size={ButtonSize.Base} />
-      ) : showDeposit && complianceState === ComplianceStates.FULL_ACCESS ? (
-        depositButton
-      ) : (
-        <WithTooltip tooltipString={showValidatorErrors ? validationErrorString : undefined}>
-          {submitButton}
-        </WithTooltip>
-      )}
-    </WithDetailsReceipt>
+    <$Footer>
+      <div tw="row gap-0.5 justify-self-end px-0 py-0.5">
+        <$WithSeparators layout="row">
+          {[
+            hasInput && (
+              <Button
+                type={ButtonType.Reset}
+                action={ButtonAction.Reset}
+                shape={ButtonShape.Pill}
+                size={ButtonSize.XSmall}
+                onClick={onClearInputs}
+                key="clear"
+              >
+                {stringGetter({ key: STRING_KEYS.CLEAR })}
+              </Button>
+            ),
+            <$HideButton
+              slotRight={<Icon iconName={IconName.Caret} size="0.66em" />}
+              shape={ButtonShape.Pill}
+              size={ButtonSize.XSmall}
+              onPressedChange={setIsReceiptOpen}
+              isPressed={isReceiptOpen}
+              key="hide"
+            >
+              {stringGetter({ key: STRING_KEYS.RECEIPT })}
+            </$HideButton>,
+          ].filter(isTruthy)}
+        </$WithSeparators>
+      </div>
+      <WithDetailsReceipt detailItems={items} hideReceipt={!isReceiptOpen}>
+        {!canAccountTrade ? (
+          <OnboardingTriggerButton size={ButtonSize.Base} />
+        ) : showDeposit && complianceState === ComplianceStates.FULL_ACCESS ? (
+          depositButton
+        ) : (
+          <WithTooltip tooltipString={showValidatorErrors ? validationErrorString : undefined}>
+            {submitButton}
+          </WithTooltip>
+        )}
+      </WithDetailsReceipt>
+    </$Footer>
   );
 };
+
+const $Footer = styled.footer`
+  ${formMixins.footer}
+  padding-bottom: var(--dialog-content-paddingBottom);
+
+  ${layoutMixins.column}
+`;
+
+const $WithSeparators = styled(WithSeparators)`
+  --separatorHeight-padding: 0.5rem;
+`;
+
+const $HideButton = styled(ToggleButton)`
+  --button-toggle-off-backgroundColor: var(--color-layer-3);
+  --button-toggle-on-backgroundColor: var(--color-layer-3);
+  --button-toggle-on-textColor: var(--button-toggle-off-textColor);
+  --button-icon-size: 1em;
+  margin-right: 0.5em;
+  gap: 0.75ch;
+
+  &[data-state='off'] {
+    svg {
+      rotate: -0.5turn;
+    }
+  }
+`;

@@ -24,12 +24,16 @@ export const SettingsHeader = ({
       label: stringGetter({ key: STRING_KEYS.LANGUAGE }),
     },
     {
-      value: `${AppRoute.Settings}/${MobileSettingsRoute.Notifications}`,
-      label: stringGetter({ key: STRING_KEYS.NOTIFICATIONS }),
-    },
-    {
       value: `${AppRoute.Settings}/${MobileSettingsRoute.Network}`,
       label: stringGetter({ key: STRING_KEYS.NETWORK }),
+    },
+    {
+      value: `${AppRoute.Settings}/${MobileSettingsRoute.Preferences}`,
+      label: stringGetter({ key: STRING_KEYS.PREFERENCES }),
+    },
+    {
+      value: `${AppRoute.Settings}/${MobileSettingsRoute.Display}`,
+      label: stringGetter({ key: STRING_KEYS.DISPLAY_SETTINGS }),
     },
   ];
 

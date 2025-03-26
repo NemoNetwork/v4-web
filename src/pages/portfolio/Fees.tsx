@@ -1,16 +1,19 @@
 import { useCallback, useMemo } from 'react';
 
+import { BonsaiCore } from '@/bonsai/ontology';
+import { FeeTierSummary } from '@/bonsai/types/summaryTypes';
 import { Nullable } from '@dydxprotocol/v4-abacus';
-import { shallowEqual } from 'react-redux';
+import { DoubleArrowUpIcon } from '@radix-ui/react-icons';
 import styled from 'styled-components';
 import tw from 'twin.macro';
 
-import { FeeTier } from '@/constants/abacus';
 import { STRING_KEYS } from '@/constants/localization';
 import { FEE_DECIMALS } from '@/constants/numbers';
 
 import { useBreakpoints } from '@/hooks/useBreakpoints';
 import { useStringGetter } from '@/hooks/useStringGetter';
+import { useSubaccount } from '@/hooks/useSubaccount';
+import { useURLConfigs } from '@/hooks/useURLConfigs';
 
 import breakpoints from '@/styles/breakpoints';
 import { layoutMixins } from '@/styles/layoutMixins';
@@ -18,15 +21,16 @@ import { layoutMixins } from '@/styles/layoutMixins';
 import { AttachedExpandingSection } from '@/components/ContentSection';
 import { ContentSectionHeader } from '@/components/ContentSectionHeader';
 import { Details } from '@/components/Details';
+import { Link } from '@/components/Link';
 import { Output, OutputType } from '@/components/Output';
 import { ColumnDef, Table } from '@/components/Table';
 import { Tag, TagSize } from '@/components/Tag';
 
-import { getUserFeeTier, getUserStats } from '@/state/accountSelectors';
 import { useAppSelector } from '@/state/appTypes';
-import { getFeeTiers } from '@/state/configsSelectors';
 
 import { isTruthy } from '@/lib/isTruthy';
+import { MustBigNumber } from '@/lib/numbers';
+import { truncateAddress } from '@/lib/wallet';
 
 const MARKET_SHARE_PERCENTAGE_FRACTION_DIGITS = 1;
 
@@ -38,9 +42,10 @@ const EQUALITY_SYMBOL_MAP = {
 export const Fees = () => {
   const stringGetter = useStringGetter();
   const { isTablet, isNotTablet } = useBreakpoints();
-  const userFeeTier = useAppSelector(getUserFeeTier, shallowEqual);
-  const userStats = useAppSelector(getUserStats, shallowEqual);
-  const feeTiers = useAppSelector(getFeeTiers, shallowEqual);
+  const userStats = useAppSelector(BonsaiCore.account.stats.data);
+  const feeTiers = useAppSelector(BonsaiCore.configs.feeTiers);
+  const { referredBy } = useSubaccount();
+  const { affiliateProgramFaq } = useURLConfigs();
 
   const volume = useMemo(() => {
     if (userStats.makerVolume30D !== undefined && userStats.takerVolume30D !== undefined) {
@@ -48,6 +53,13 @@ export const Fees = () => {
     }
     return null;
   }, [userStats]);
+
+  const userFeeTier = userStats.feeTierId;
+
+  const hasReceivedFeeTierBonus =
+    userFeeTier === '3' &&
+    referredBy !== undefined &&
+    MustBigNumber(volume).lt(feeTiers?.[2]?.volume ?? 0);
 
   const AdditionalConditions = useCallback(
     (conditions: {
@@ -93,27 +105,65 @@ export const Fees = () => {
     <AttachedExpandingSection>
       {isNotTablet && <ContentSectionHeader title={stringGetter({ key: STRING_KEYS.FEES })} />}
       <div tw="flexColumn max-w-[100vw] gap-1.5">
-        <$FeesDetails
-          layout="grid"
-          items={[
-            {
-              key: 'volume',
-              label: (
-                <$CardLabel>
-                  <span>{stringGetter({ key: STRING_KEYS.TRAILING_VOLUME })}</span>
-                  <span>{stringGetter({ key: STRING_KEYS._30D })}</span>
-                </$CardLabel>
-              ),
-              value: <Output type={OutputType.Fiat} value={volume} />,
-            },
-          ]}
-        />
+        <div tw="flex flex-row">
+          <$FeesDetails
+            layout="grid"
+            hasReceivedFeeTierBonus={hasReceivedFeeTierBonus}
+            items={[
+              {
+                key: 'volume',
+                label: (
+                  <$CardLabel>
+                    <span>{stringGetter({ key: STRING_KEYS.TRAILING_VOLUME })}</span>
+                    <span>{stringGetter({ key: STRING_KEYS._30D })}</span>
+                  </$CardLabel>
+                ),
+                value: <Output type={OutputType.Fiat} value={volume} />,
+              },
+              hasReceivedFeeTierBonus && {
+                key: 'bonus',
+                label: (
+                  <$CardLabel>
+                    {stringGetter({
+                      key: STRING_KEYS.YOUR_FEE_TIER,
+                      params: {
+                        TIER: (
+                          <span tw="text-color-text-2">
+                            {userFeeTier}{' '}
+                            <DoubleArrowUpIcon tw="mb-[-1px] inline h-0.75 w-0.75 text-color-positive" />
+                          </span>
+                        ),
+                      },
+                    })}
+                  </$CardLabel>
+                ),
+                value: (
+                  <span tw="font-mini-book">
+                    {stringGetter({
+                      key: STRING_KEYS.GIFTED_FEE_TIER_BONUS,
+                      params: {
+                        AFFILIATE: truncateAddress(referredBy),
+                      },
+                    })}{' '}
+                    <Link
+                      tw="inline-flex text-color-accent visited:text-color-accent"
+                      href={affiliateProgramFaq}
+                    >
+                      {stringGetter({ key: STRING_KEYS.LEARN_MORE })} →
+                    </Link>
+                  </span>
+                ),
+              },
+            ].filter(isTruthy)}
+          />
+        </div>
 
         <$FeeTable
           label={stringGetter({ key: STRING_KEYS.FEE_TIERS })}
           data={feeTiers ?? []}
-          getRowKey={(row: FeeTier) => row.tier}
-          getRowAttributes={(row: FeeTier) => ({
+          tableId="fees"
+          getRowKey={(row: FeeTierSummary) => row.tier}
+          getRowAttributes={(row: FeeTierSummary) => ({
             'data-yours': row.tier === userFeeTier,
           })}
           columns={(
@@ -138,16 +188,21 @@ export const Fees = () => {
                 label: stringGetter({ key: STRING_KEYS.VOLUME_30D }),
                 allowsSorting: false,
                 renderCell: ({ symbol, volume: vol, makerShare, totalShare }) => (
-                  <>
-                    <span>{`${
-                      symbol in EQUALITY_SYMBOL_MAP
-                        ? EQUALITY_SYMBOL_MAP[symbol as keyof typeof EQUALITY_SYMBOL_MAP]
-                        : symbol
-                    } `}</span>
-                    <$HighlightOutput type={OutputType.CompactFiat} value={vol} />
-                    {isTablet &&
-                      AdditionalConditions({ totalShare, makerShare, isAdditional: true })}
-                  </>
+                  <div tw="flex flex-col">
+                    <div tw="flex flex-row justify-end gap-0.25">
+                      <span>{`${
+                        symbol in EQUALITY_SYMBOL_MAP
+                          ? EQUALITY_SYMBOL_MAP[symbol as keyof typeof EQUALITY_SYMBOL_MAP]
+                          : symbol
+                      } `}</span>
+                      <$HighlightOutput type={OutputType.CompactFiat} value={vol} />
+                    </div>
+                    {isTablet && (
+                      <div tw="flex justify-end">
+                        {AdditionalConditions({ totalShare, makerShare, isAdditional: true })}
+                      </div>
+                    )}
+                  </div>
                 ),
               },
               isNotTablet && {
@@ -181,11 +236,11 @@ export const Fees = () => {
                   />
                 ),
               },
-            ] satisfies Array<false | ColumnDef<FeeTier>>
+            ] satisfies Array<false | ColumnDef<FeeTierSummary>>
           ).filter(isTruthy)}
           selectionBehavior="replace"
           paginationBehavior="showAll"
-          withOuterBorder={isNotTablet}
+          withOuterBorder
           withInnerBorders
         />
       </div>
@@ -199,26 +254,35 @@ const $AdditionalConditions = styled.div`
   > :nth-child(2) {
     font: var(--font-small-book);
   }
+
+  @media ${breakpoints.mobile} {
+    max-width: 6rem;
+  }
 `;
 
 const $AdditionalConditionsText = styled.span`
   display: flex;
   gap: 0.5ch;
   justify-content: end;
+  align-items: flex-end;
 
   @media ${breakpoints.mobile} {
     display: inline;
-    max-width: 8rem;
     min-width: 0;
 
     output {
       display: inline;
     }
+
+    :after {
+      content: ' ';
+    }
   }
 `;
 
-const $FeesDetails = styled(Details)`
+const $FeesDetails = styled(Details)<{ hasReceivedFeeTierBonus?: boolean }>`
   gap: 1rem;
+  --details-grid-numColumns: ${({ hasReceivedFeeTierBonus }) => (hasReceivedFeeTierBonus ? 2 : 1)};
 
   @media ${breakpoints.notTablet} {
     margin: 0 1.25rem;
@@ -231,6 +295,7 @@ const $FeesDetails = styled(Details)`
 
   > div {
     max-width: 16rem;
+    align-content: normal;
 
     gap: 1rem;
 
@@ -258,6 +323,7 @@ const $TextRow = styled.div`
 `;
 
 const $CardLabel = styled($TextRow)`
+  height: 1.5rem;
   font: var(--font-small-book);
 
   color: var(--color-text-1);
@@ -294,7 +360,7 @@ const $FeeTable = styled(Table)`
   }
 
   @media ${breakpoints.notTablet} {
-    --tableStickyRow-backgroundColor: var(--color-layer-1);
+    --tableStickyRow-backgroundColor: var(--color-layer-2);
   }
 ` as typeof Table;
 const $Highlighted = tw.strong`text-color-text-1`;

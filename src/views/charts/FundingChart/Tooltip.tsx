@@ -1,8 +1,12 @@
 import type { RenderTooltipParams } from '@visx/xychart/lib/components/Tooltip';
 
-import { FundingRateResolution, type FundingChartDatum } from '@/constants/charts';
+import {
+  FundingDirection,
+  FundingRateResolution,
+  type FundingChartDatum,
+} from '@/constants/charts';
 import { STRING_KEYS } from '@/constants/localization';
-import { FundingDirection } from '@/constants/markets';
+import { FUNDING_DECIMALS } from '@/constants/numbers';
 
 import { useStringGetter } from '@/hooks/useStringGetter';
 
@@ -12,7 +16,7 @@ import { TooltipContent } from '@/components/visx/TooltipContent';
 
 type FundingChartTooltipProps = {
   fundingRateView: FundingRateResolution;
-  latestDatum: FundingChartDatum;
+  latestDatum: FundingChartDatum | undefined;
 } & Pick<RenderTooltipParams<FundingChartDatum>, 'tooltipData'>;
 
 export const FundingChartTooltipContent = ({
@@ -33,7 +37,7 @@ export const FundingChartTooltipContent = ({
           [FundingDirection.ToLong]: 'var(--color-negative)',
           [FundingDirection.ToShort]: 'var(--color-positive)',
           [FundingDirection.None]: 'var(--color-layer-6)',
-        }[tooltipDatum.direction]
+        }[tooltipDatum?.direction ?? FundingDirection.None]
       }
     >
       <h4>
@@ -65,7 +69,7 @@ export const FundingChartTooltipContent = ({
                         key: STRING_KEYS.SHORT_POSITION_SHORT,
                       })}`,
                       [FundingDirection.None]: undefined,
-                    }[tooltipDatum.direction]
+                    }[tooltipDatum?.direction ?? FundingDirection.None]
                   }
                 />
               ),
@@ -82,11 +86,13 @@ export const FundingChartTooltipContent = ({
               value: (
                 <Output
                   type={OutputType.SmallPercent}
+                  fractionDigits={FUNDING_DECIMALS}
                   value={
                     {
-                      [FundingRateResolution.OneHour]: tooltipDatum.fundingRate,
-                      [FundingRateResolution.EightHour]: tooltipDatum.fundingRate * 8,
-                      [FundingRateResolution.Annualized]: tooltipDatum.fundingRate * (24 * 365),
+                      [FundingRateResolution.OneHour]: tooltipDatum?.fundingRate ?? 0,
+                      [FundingRateResolution.EightHour]: (tooltipDatum?.fundingRate ?? 0) * 8,
+                      [FundingRateResolution.Annualized]:
+                        (tooltipDatum?.fundingRate ?? 0) * (24 * 365),
                     }[fundingRateView]
                   }
                   showSign={ShowSign.Both}
@@ -98,7 +104,7 @@ export const FundingChartTooltipContent = ({
               label: isShowingCurrentFundingRate
                 ? 'Time Remaining'
                 : stringGetter({ key: STRING_KEYS.TIME }),
-              value: <Output type={OutputType.DateTime} value={tooltipDatum.time} />,
+              value: <Output type={OutputType.DateTime} value={tooltipDatum?.time} />,
             },
           ] satisfies Array<DetailsItem>
         }

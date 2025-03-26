@@ -5,28 +5,26 @@ import { curveStepAfter } from '@visx/curve';
 import { LinearGradient } from '@visx/gradient';
 import { Point } from '@visx/point';
 import {
-    AreaSeries,
-    Axis,
-    DataProvider,
-    EventEmitterProvider, // AnimatedAxis,
-    Grid, // AnimatedGrid,
-    LineSeries, // AnimatedAreaSeries,
-    buildChartTheme,
-    darkTheme,
-    type EventHandlerParams,
+  AreaSeries,
+  Axis,
+  DataProvider,
+  EventEmitterProvider, // AnimatedAxis,
+  Grid, // AnimatedGrid,
+  LineSeries, // AnimatedAreaSeries,
+  buildChartTheme,
+  darkTheme,
+  type EventHandlerParams,
 } from '@visx/xychart';
-import { shallowEqual } from 'react-redux';
 import styled, { keyframes } from 'styled-components';
 
 import {
-    DepthChartDatum,
-    DepthChartPoint,
-    DepthChartSeries,
-    SERIES_KEY_FOR_ORDER_SIDE,
+  DepthChartDatum,
+  DepthChartPoint,
+  DepthChartSeries,
+  SERIES_KEY_FOR_ORDER_SIDE,
 } from '@/constants/charts';
 import { StringGetterFunction } from '@/constants/localization';
 
-import { useOrderbookValuesForDepthChart } from '@/hooks/Orderbook/useOrderbookValues';
 import { useBreakpoints } from '@/hooks/useBreakpoints';
 import { useLocaleSeparators } from '@/hooks/useLocaleSeparators';
 
@@ -37,10 +35,9 @@ import Tooltip from '@/components/visx/XYChartTooltipWithBounds';
 import { XYChartWithPointerEvents } from '@/components/visx/XYChartWithPointerEvents';
 
 import { useAppSelector } from '@/state/appTypes';
-import { getCurrentMarketAssetData } from '@/state/assetsSelectors';
-import { getCurrentMarketConfig } from '@/state/perpetualsSelectors';
 
 import { MustBigNumber } from '@/lib/numbers';
+import { orEmptyObj } from '@/lib/typeUtils';
 
 import { DepthChartTooltipContent } from './Tooltip';
 
@@ -68,12 +65,15 @@ export const DepthChart = ({
   const { decimal: decimalSeparator, group: groupSeparator } = useLocaleSeparators();
 
   // Chart data
-  const { id = '' } = useAppSelector(getCurrentMarketAssetData, shallowEqual) ?? {};
-  const { stepSizeDecimals, tickSizeDecimals } =
-    useAppSelector(getCurrentMarketConfig, shallowEqual) ?? {};
+  const {
+    stepSizeDecimals,
+    tickSizeDecimals,
+    assetId: id,
+  } = orEmptyObj(useAppSelector(BonsaiHelpers.currentMarket.stableMarketInfo));
 
-  const { bids, asks, lowestBid, highestBid, lowestAsk, highestAsk, midMarketPrice, orderbook } =
-    useOrderbookValuesForDepthChart();
+  const { bids, asks, lowestBid, highestBid, lowestAsk, highestAsk, midPrice } = orEmptyObj(
+    useAppSelector(BonsaiHelpers.currentMarket.depthChart.data)
+  );
 
   // Chart state
 
@@ -85,44 +85,44 @@ export const DepthChart = ({
   const [zoomDomain, setZoomDomain] = useState<undefined | number>();
 
   useEffect(() => {
-    if (!midMarketPrice) {
+    if (!midPrice) {
       setZoomDomain(undefined);
     } else if (!zoomDomain) {
       setZoomDomain(
         // Start by showing smallest of:
         Math.min(
           // Mid-market price ± 1.5%
-          midMarketPrice * 0.015,
+          midPrice * 0.015,
           // Mid-market price ± halfway to lowest bid
-          (midMarketPrice - lowestBid.price) / 2,
+          (midPrice - (lowestBid?.price ?? 0)) / 2,
           // Mid-market price ± halfway to highest ask
-          (highestAsk.price - midMarketPrice) / 2
+          ((highestAsk?.price ?? midPrice) - midPrice) / 2
         )
       );
     }
-  }, [midMarketPrice]);
+  }, [midPrice]);
 
   // Computations
 
   const { domain, range } = useMemo(() => {
-    if (!(zoomDomain && midMarketPrice && asks.length && bids.length))
+    if (!(zoomDomain && midPrice && asks?.length && bids?.length))
       return { domain: [0, 0] as const, range: [0, 0] as const };
 
     const newDomain = [
-      clamp(midMarketPrice - zoomDomain, 0, highestBid.price),
-      clamp(midMarketPrice + zoomDomain, lowestAsk.price, highestAsk.price),
+      clamp(midPrice - zoomDomain, 0, highestBid?.price ?? 0),
+      clamp(midPrice + zoomDomain, lowestAsk?.price ?? 0, highestAsk?.price ?? 0),
     ] as const;
 
     const newRange = [
       0,
       [...bids, ...asks]
         .filter((datum) => datum.price >= newDomain[0] && datum.price <= newDomain[1])
-        .map((datum) => datum.depth ?? 0)
+        .map((datum) => datum.depth)
         .reduce((a, b) => Math.max(a, b), 0),
     ] as const;
 
     return { domain: newDomain, range: newRange };
-  }, [orderbook, zoomDomain]);
+  }, [asks, bids, highestAsk?.price, highestBid?.price, lowestAsk?.price, midPrice, zoomDomain]);
 
   const getChartPoint = useCallback(
     (point: Point | EventHandlerParams<object>) => {
@@ -139,12 +139,12 @@ export const DepthChart = ({
       }
 
       return {
-        side: MustBigNumber(price).lt(midMarketPrice!) ? OrderSide.BUY : OrderSide.SELL,
+        side: MustBigNumber(price).lt(midPrice!) ? OrderSide.BUY : OrderSide.SELL,
         price,
         size,
       } satisfies DepthChartPoint;
     },
-    [midMarketPrice]
+    [midPrice]
   );
 
   const formatNumber = useCallback(
@@ -160,7 +160,7 @@ export const DepthChart = ({
 
   // Render conditions
 
-  if (!(zoomDomain && midMarketPrice && asks.length && bids.length))
+  if (!(zoomDomain && midPrice && asks?.length && bids?.length))
     return <LoadingSpace id="depth-chart-loading" />;
 
   // Events
@@ -175,8 +175,8 @@ export const DepthChart = ({
           1e-320,
           Math.min(Number.MAX_SAFE_INTEGER, zoomDomain * Math.exp(wheelDelta / 1000))
         ),
-        Math.min(midMarketPrice - highestBid.price, lowestAsk.price - midMarketPrice),
-        Math.max(midMarketPrice - lowestBid.price, highestAsk.price - midMarketPrice)
+        Math.min(midPrice - (highestBid?.price ?? 0), (lowestAsk?.price ?? 0) - midPrice),
+        Math.max(midPrice - (lowestBid?.price ?? 0), (highestAsk?.price ?? 0) - midPrice)
       )
     );
   };
@@ -210,8 +210,8 @@ export const DepthChart = ({
               top: 0,
               bottom: 32,
             }}
-            onPointerUp={(point) => point && onChartClick?.(getChartPoint(point))}
-            onPointerMove={(point) => point && setChartPointAtPointer(getChartPoint(point))}
+            onPointerUp={(point) => onChartClick?.(getChartPoint(point))}
+            onPointerMove={(point) => setChartPointAtPointer(getChartPoint(point))}
             onPointerPressedChange={(pointerPressed) => setIsPointerPressed(pointerPressed)}
           >
             <Axis orientation="bottom" numTicks={4} tickFormat={formatNumber} />
@@ -227,22 +227,22 @@ export const DepthChart = ({
             <AreaSeries
               dataKey={DepthChartSeries.Bids}
               data={
-                bids.length
+                bids.length > 0
                   ? [
                       {
-                        ...highestBid,
+                        ...lowestBid!,
                         depth: 0,
                       },
                       ...bids,
                       {
-                        ...lowestBid,
-                        price: 0,
+                        ...highestBid!,
+                        depth: 0,
                       },
-                    ].reverse()
+                    ]
                   : []
               }
-              xAccessor={(datum: DepthChartDatum) => datum?.price}
-              yAccessor={(datum: DepthChartDatum) => datum?.depth}
+              xAccessor={(datum: DepthChartDatum | undefined) => datum?.price ?? 0}
+              yAccessor={(datum: DepthChartDatum | undefined) => datum?.depth ?? 0}
               curve={curveStepAfter}
               lineProps={{ strokeWidth: 1.5 }}
               fillOpacity={0.2}
@@ -258,18 +258,22 @@ export const DepthChart = ({
             <AreaSeries
               dataKey={DepthChartSeries.Asks}
               data={
-                asks.length
+                asks.length > 0
                   ? [
                       {
-                        ...lowestAsk,
+                        ...lowestAsk!,
                         depth: 0,
                       },
                       ...asks,
+                      {
+                        ...highestAsk!,
+                        depth: 0,
+                      },
                     ]
                   : []
               }
-              xAccessor={(datum: DepthChartDatum) => datum?.price}
-              yAccessor={(datum: DepthChartDatum) => datum?.depth}
+              xAccessor={(datum: DepthChartDatum | undefined) => datum?.price ?? 0}
+              yAccessor={(datum: DepthChartDatum | undefined) => datum?.depth ?? 0}
               curve={curveStepAfter}
               lineProps={{ strokeWidth: 1.5 }}
               fillOpacity={0.2}
@@ -286,21 +290,21 @@ export const DepthChart = ({
               dataKey={DepthChartSeries.MidMarket}
               data={[
                 {
-                  price: midMarketPrice,
+                  price: midPrice,
                   depth: lerp(1.2, ...range),
                 },
                 {
-                  price: midMarketPrice,
+                  price: midPrice,
                   depth: lerp(0.5, ...range),
                 },
                 {
-                  price: midMarketPrice,
+                  price: midPrice,
                   depth: lerp(-0.1, ...range),
                 },
               ]}
               strokeWidth={0.25}
-              xAccessor={(datum) => datum?.price}
-              yAccessor={(datum) => datum?.depth}
+              xAccessor={(datum: { price: number; depth: number } | undefined) => datum?.price ?? 0}
+              yAccessor={(datum: { price: number; depth: number } | undefined) => datum?.depth ?? 0}
             />
 
             <Tooltip<DepthChartDatum>
@@ -317,7 +321,7 @@ export const DepthChart = ({
                   value={
                     isEditingOrder && chartPointAtPointer
                       ? chartPointAtPointer.price
-                      : tooltipData!.nearestDatum?.datum.price
+                      : tooltipData!.nearestDatum?.datum?.price
                   }
                   useGrouping={false}
                   accentColor={
@@ -336,7 +340,7 @@ export const DepthChart = ({
               )}
               showHorizontalCrosshair
               horizontalCrosshairStyle={{ strokeWidth: 1, strokeDasharray: '5 5', opacity: 0.7 }}
-              snapCrosshairToDatumY={!isEditingOrder}
+              snapCrosshairToDatumY={false}
               renderYAxisLabel={({ tooltipData }) =>
                 (isEditingOrder || tooltipData!.nearestDatum?.datum.depth) && (
                   <$YAxisLabelOutput
@@ -386,6 +390,7 @@ export const DepthChart = ({
     </$Container>
   );
 };
+
 const $Container = styled.div`
   width: 0;
   min-width: 100%;
@@ -409,7 +414,6 @@ const $Container = styled.div`
       animation: ${keyframes`
         from {
           opacity: 0;
-          /* filter: blur(2px); */
         }
       `} 0.1s var(--ease-out-expo);
     }
@@ -418,12 +422,12 @@ const $Container = styled.div`
       animation: ${keyframes`
         to {
           opacity: 0;
-          /* filter: blur(2px); */
         }
       `} 0.2s 0.3s var(--ease-out-expo) forwards;
     }
   }
 `;
+
 const $YAxisLabelOutput = styled(AxisLabelOutput)`
   --axisLabel-offset: 0.5rem;
 

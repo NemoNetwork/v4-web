@@ -13,6 +13,8 @@ import {
 } from '@radix-ui/react-tabs';
 import styled, { css, keyframes } from 'styled-components';
 
+import { ButtonShape, ButtonStyle } from '@/constants/buttons';
+
 import { layoutMixins } from '@/styles/layoutMixins';
 import { tabMixins } from '@/styles/tabMixins';
 
@@ -21,8 +23,6 @@ import { IconButton } from '@/components/IconButton';
 import { type TabItem } from '@/components/Tabs';
 import { Tag } from '@/components/Tag';
 import { Toolbar } from '@/components/Toolbar';
-
-import { testFlags } from '@/lib/testFlags';
 
 type ElementProps<TabItemsValue> = {
   defaultTab?: TabItemsValue;
@@ -56,8 +56,6 @@ export const CollapsibleTabs = <TabItemsValue extends string>({
 
   className,
 }: CollapsibleTabsProps<TabItemsValue>) => {
-  const { uiRefresh } = testFlags;
-
   const currentTab = tabItems.find((tabItem) => tabItem.value === tab);
   const withBorders = dividerStyle === 'border';
   const withUnderline = dividerStyle === 'underline';
@@ -68,7 +66,6 @@ export const CollapsibleTabs = <TabItemsValue extends string>({
       defaultValue={defaultTab}
       value={tab}
       onValueChange={(v) => setTab?.(v as TabItemsValue)}
-      $uiRefreshEnabled={uiRefresh}
       asChild
     >
       <$CollapsibleRoot
@@ -93,10 +90,15 @@ export const CollapsibleTabs = <TabItemsValue extends string>({
             ))}
           </$TabsList>
 
-          <Toolbar tw="inlineRow">
+          <Toolbar>
             {currentTab?.slotToolbar ?? slotToolbar}
             <CollapsibleTrigger asChild>
-              <$IconButton iconName={IconName.Caret} isToggle />
+              <$IconButton
+                iconName={IconName.Caret}
+                isToggle
+                buttonStyle={ButtonStyle.WithoutBackground}
+                shape={ButtonShape.Square}
+              />
             </CollapsibleTrigger>
           </Toolbar>
         </$Header>
@@ -112,16 +114,14 @@ export const CollapsibleTabs = <TabItemsValue extends string>({
     </$TabsRoot>
   );
 };
-const $TabsRoot = styled(TabsRoot)<{ $uiRefreshEnabled: boolean }>`
+const $TabsRoot = styled(TabsRoot)`
   /* Overrides */
   --trigger-backgroundColor: var(--color-layer-2);
   --trigger-textColor: var(--color-text-0);
 
   --trigger-active-backgroundColor: var(--color-layer-1);
   --trigger-active-textColor: var(--color-text-2);
-  --trigger-active-underlineColor: ${({ $uiRefreshEnabled }) => css`
-    ${$uiRefreshEnabled ? css`var(--color-accent);` : css`var(--color-text-2);`}
-  `};
+  --trigger-active-underlineColor: var(--color-accent);
   --trigger-active-underline-size: 2px;
   --trigger-underline-size: 0px;
 
@@ -232,6 +232,8 @@ const $Header = styled.header`
   ${$CollapsibleRoot}[data-state='closed'] & {
     box-shadow: none;
   }
+
+  z-index: 2;
 `;
 
 const $IconButton = styled(IconButton)`

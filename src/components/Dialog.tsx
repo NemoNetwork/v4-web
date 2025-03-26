@@ -11,10 +11,11 @@ import {
   Title,
   Trigger,
 } from '@radix-ui/react-dialog';
-import styled, { css, keyframes } from 'styled-components';
+import styled, { css } from 'styled-components';
 import tw from 'twin.macro';
 
 import { useDialogArea } from '@/hooks/useDialogArea';
+import { useResizeObserver } from '@/hooks/useResizeObserver';
 
 import breakpoints from '@/styles/breakpoints';
 import { layoutMixins } from '@/styles/layoutMixins';
@@ -37,8 +38,10 @@ type ElementProps = {
   description?: React.ReactNode;
   onBack?: () => void;
   preventClose?: boolean;
+  preventCloseOnOverlayClick?: boolean;
   slotTrigger?: React.ReactNode;
   slotHeaderAbove?: React.ReactNode;
+  slotHeader?: React.ReactNode;
   slotHeaderInner?: React.ReactNode;
   slotFooter?: React.ReactNode;
   withClose?: boolean;
@@ -49,6 +52,7 @@ type StyleProps = {
   portalContainer?: HTMLElement;
   hasHeaderBorder?: boolean;
   hasHeaderBlur?: boolean;
+  hasFooterBorder?: boolean;
   children?: React.ReactNode;
   className?: string;
   stacked?: boolean;
@@ -80,8 +84,10 @@ export const Dialog = ({
   description,
   onBack,
   preventClose,
+  preventCloseOnOverlayClick,
   slotTrigger,
   slotHeaderAbove,
+  slotHeader,
   slotHeaderInner,
   slotFooter,
   stacked,
@@ -90,12 +96,19 @@ export const Dialog = ({
   portalContainer,
   hasHeaderBorder = false,
   hasHeaderBlur = true,
+  hasFooterBorder = false,
   withAnimation = false,
   withOverlay = ![DialogPlacement.Inline, DialogPlacement.FullScreen].includes(placement),
   children,
   className,
 }: DialogProps) => {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const { height = 0 } = useResizeObserver({
+    ref,
+    box: 'border-box',
+  });
 
   return (
     <Root modal={withOverlay} open={isOpen} onOpenChange={setIsOpen}>
@@ -109,61 +122,73 @@ export const Dialog = ({
             closeButtonRef.current?.focus();
           }}
           onInteractOutside={(e: Event) => {
-            if (!withOverlay || preventClose) {
+            if (!withOverlay || !!preventClose || !!preventCloseOnOverlayClick) {
               e.preventDefault();
             }
           }}
+          $height={height}
           $stacked={stacked}
           $withAnimation={withAnimation}
         >
-          {slotHeaderAbove}
-          {stacked ? (
-            <$StackedHeaderTopRow $withBorder={hasHeaderBorder} $withBlur={hasHeaderBlur}>
-              {onBack && <$BackButton onClick={onBack} />}
+          <$InnerContainer ref={ref} placement={placement}>
+            {slotHeaderAbove}
+            {stacked ? (
+              <$StackedHeaderTopRow $withBorder={hasHeaderBorder} $withBlur={hasHeaderBlur}>
+                {onBack && <$BackButton onClick={onBack} />}
 
-              {slotIcon}
+                {slotIcon}
 
-              {!preventClose && withClose && (
-                <$Close ref={closeButtonRef} $absolute={stacked}>
-                  <Icon iconName={IconName.Close} />
-                </$Close>
-              )}
-
-              {title && <$Title>{title}</$Title>}
-
-              {description && <$Description>{description}</$Description>}
-
-              {slotHeaderInner}
-            </$StackedHeaderTopRow>
-          ) : (
-            <$Header $withBorder={hasHeaderBorder} $withBlur={hasHeaderBlur}>
-              <div tw="row gap-[--dialog-title-gap]">
-                {onBack && <BackButton onClick={onBack} />}
-
-                {slotIcon && (
-                  <div tw="row h-[1em] w-[1em] text-[length:--dialog-icon-size] leading-none">
-                    {slotIcon}
-                  </div>
+                {!preventClose && withClose && (
+                  <$Close ref={closeButtonRef} $absolute={stacked}>
+                    <Icon iconName={IconName.Close} />
+                  </$Close>
                 )}
 
                 {title && <$Title>{title}</$Title>}
 
+                {description && <$Description>{description}</$Description>}
+
+                {slotHeaderInner}
+              </$StackedHeaderTopRow>
+            ) : slotHeader ? (
+              <div>
                 {!preventClose && withClose && (
-                  <$Close ref={closeButtonRef}>
+                  <$Close ref={closeButtonRef} $absolute>
                     <Icon iconName={IconName.Close} />
                   </$Close>
                 )}
+                {slotHeader}
               </div>
+            ) : (
+              <$Header $withBorder={hasHeaderBorder} $withBlur={hasHeaderBlur}>
+                <div tw="row gap-[--dialog-title-gap]">
+                  {onBack && <BackButton onClick={onBack} />}
 
-              {description && <$Description>{description}</$Description>}
+                  {slotIcon && (
+                    <div tw="row h-[1em] w-[1em] text-[length:--dialog-icon-size] leading-none">
+                      {slotIcon}
+                    </div>
+                  )}
 
-              {slotHeaderInner}
-            </$Header>
-          )}
+                  {title && <$Title>{title}</$Title>}
 
-          <$Content>{children}</$Content>
+                  {!preventClose && withClose && (
+                    <$Close ref={closeButtonRef}>
+                      <Icon iconName={IconName.Close} />
+                    </$Close>
+                  )}
+                </div>
 
-          {slotFooter && <$Footer>{slotFooter}</$Footer>}
+                {description && <$Description>{description}</$Description>}
+
+                {slotHeaderInner}
+              </$Header>
+            )}
+
+            <$Content>{children}</$Content>
+
+            {slotFooter && <$Footer $withBorder={hasFooterBorder}>{slotFooter}</$Footer>}
+          </$InnerContainer>
         </$Container>
       </DialogPortal>
     </Root>
@@ -183,6 +208,7 @@ const $Overlay = styled(Overlay)`
 
 const $Container = styled(Content)<{
   placement: DialogPlacement;
+  $height?: number;
   $stacked?: boolean;
   $withAnimation?: boolean;
 }>`
@@ -242,24 +268,28 @@ const $Container = styled(Content)<{
 
   outline: none;
 
-  ${({ placement, $withAnimation }) =>
+  ${({ placement, $height, $withAnimation }) =>
     ({
       [DialogPlacement.Default]: css`
         inset: var(--dialog-inset);
         margin: auto;
 
         max-width: var(--dialog-width);
-        height: fit-content;
         max-height: var(--dialog-height);
+
+        ${$withAnimation
+          ? css`
+              height: ${$height ? `${$height}px` : 'fit-content'};
+              transition: height 0.25s ease-in-out;
+            `
+          : css`
+              height: fit-content;
+            `}
 
         display: flex;
         flex-direction: column;
 
         border-radius: var(--dialog-radius);
-        /* clip-path: inset(
-          calc(-1 * var(--border-width)) round calc(var(--dialog-radius) + var(--border-width))
-        );
-        overflow-clip-margin: var(--border-width); */
 
         @media ${breakpoints.mobile} {
           top: calc(var(--dialog-inset) * 2);
@@ -271,94 +301,18 @@ const $Container = styled(Content)<{
 
           border-bottom-left-radius: 0;
           border-bottom-right-radius: 0;
-
-          /* Hack (uneven border-radius causes overflow issues) */
-          /* top: auto;
-          bottom: calc(-1 * var(--dialog-radius));
-          padding-bottom: var(--dialog-radius); */
         }
-
-        ${$withAnimation &&
-        css`
-          @media (prefers-reduced-motion: no-preference) {
-            &[data-state='open'] {
-              animation: ${keyframes`
-              from {
-                opacity: 0;
-              }
-              0.01% {
-                max-height: 0;
-              }
-            `} 0.15s var(--ease-out-expo);
-            }
-
-            &[data-state='closed'] {
-              animation: ${keyframes`
-              to {
-                opacity: 0;
-                scale: 0.9;
-                max-height: 0;
-              }
-            `} 0.15s;
-            }
-          }
-        `}
       `,
       [DialogPlacement.Sidebar]: css`
         --dialog-width: var(--sidebar-width);
+        height: 100%;
 
         @media ${breakpoints.notMobile} {
           max-width: var(--dialog-width);
           margin-left: auto;
         }
-
-        ${$withAnimation &&
-        css`
-          @media (prefers-reduced-motion: no-preference) {
-            &[data-state='open'] {
-              animation: ${keyframes`
-              from {
-                translate: 100% 0;
-                opacity: 0;
-              }
-            `} 0.15s var(--ease-out-expo);
-            }
-
-            &[data-state='closed'] {
-              animation: ${keyframes`
-              to {
-                translate: 100% 0;
-                opacity: 0;
-              }
-            `} 0.15s var(--ease-out-expo);
-            }
-          }
-        `}
       `,
-      [DialogPlacement.Inline]: css`
-        ${$withAnimation &&
-        css`
-          @media (prefers-reduced-motion: no-preference) {
-            &[data-state='open'] {
-              animation: ${keyframes`
-              from {
-                scale: 0.99;
-                opacity: 0;
-              }
-            `} 0.15s var(--ease-out-expo);
-            }
-
-            &[data-state='closed'] {
-              animation: ${keyframes`
-              to {
-                scale: 0.99;
-                opacity: 0;
-              }
-            `} 0.15s var(--ease-out-expo);
-            }
-          }
-        `}
-      `,
+      [DialogPlacement.Inline]: css``,
       [DialogPlacement.FullScreen]: css`
         --dialog-width: 100vw;
         --dialog-height: 100vh;
@@ -373,6 +327,25 @@ const $Container = styled(Content)<{
       justify-content: center;
       text-align: center;
     `}
+`;
+
+const $InnerContainer = styled.div<{ placement: DialogPlacement }>`
+  ${({ placement }) =>
+    ({
+      [DialogPlacement.Default]: css``,
+      [DialogPlacement.Sidebar]: css`
+        ${layoutMixins.flexColumn}
+        height: 100%;
+      `,
+      [DialogPlacement.Inline]: css`
+        ${layoutMixins.flexColumn}
+        height: 100%;
+      `,
+      [DialogPlacement.FullScreen]: css`
+        ${layoutMixins.flexColumn}
+        height: 100%;
+      `,
+    })[placement]}
 `;
 
 const $Header = styled.header<{ $withBorder: boolean; $withBlur: boolean }>`
@@ -399,6 +372,7 @@ const $Header = styled.header<{ $withBorder: boolean; $withBlur: boolean }>`
       --stickyArea-backdropFilter: none;
     `};
 `;
+
 const $StackedHeaderTopRow = styled.div<{ $withBorder: boolean; $withBlur: boolean }>`
   ${layoutMixins.flexColumn}
   align-items: center;
@@ -439,6 +413,7 @@ const $Content = styled.div`
 
   isolation: isolate;
 `;
+
 const $Close = styled(Close)<{ $absolute?: boolean }>`
   width: 0.7813rem;
   height: 0.7813rem;
@@ -452,6 +427,7 @@ const $Close = styled(Close)<{ $absolute?: boolean }>`
   align-items: center;
 
   border-radius: 0.25rem;
+  z-index: 1;
 
   color: var(--color-text-0);
 
@@ -492,11 +468,17 @@ const $Title = tw(Title)`flex-1 font-large-medium text-color-text-2 overflow-hid
 
 const $Description = tw(Description)`mt-0.5 text-color-text-0 font-base-book`;
 
-const $Footer = styled.footer`
+const $Footer = styled.footer<{ $withBorder: boolean }>`
   display: grid;
   ${layoutMixins.stickyFooter}
-  ${layoutMixins.withStickyFooterBackdrop}
-  --stickyFooterBackdrop-outsetX: var(--dialog-paddingX);
+
+  ${({ $withBorder }) =>
+    $withBorder &&
+    css`
+      ${layoutMixins.withOuterBorder};
+      background: var(--dialog-backgroundColor);
+      --dialog-footer-paddingTop: var(--dialog-footer-paddingBottom);
+    `};
 
   padding: var(--dialog-footer-paddingTop) var(--dialog-footer-paddingLeft)
     var(--dialog-footer-paddingBottom) var(--dialog-footer-paddingRight);

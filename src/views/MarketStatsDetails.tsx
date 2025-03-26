@@ -1,10 +1,8 @@
-import { useEffect, useRef } from 'react';
-
-import { shallowEqual } from 'react-redux';
+import { BonsaiCore, BonsaiHelpers } from '@/bonsai/ontology';
 import styled, { css } from 'styled-components';
 
 import { STRING_KEYS } from '@/constants/localization';
-import { LARGE_TOKEN_DECIMALS, TINY_PERCENT_DECIMALS } from '@/constants/numbers';
+import { FUNDING_DECIMALS, LARGE_TOKEN_DECIMALS } from '@/constants/numbers';
 import { TooltipStringKeys } from '@/constants/tooltips';
 import { DisplayUnit } from '@/constants/trade';
 
@@ -24,15 +22,10 @@ import { WithTooltip } from '@/components/WithTooltip';
 import { NextFundingTimer } from '@/views/NextFundingTimer';
 
 import { useAppSelector } from '@/state/appTypes';
-import { getSelectedDisplayUnit } from '@/state/configsSelectors';
-import {
-  getCurrentMarketConfig,
-  getCurrentMarketData,
-  getCurrentMarketMidMarketPrice,
-} from '@/state/perpetualsSelectors';
+import { getSelectedDisplayUnit } from '@/state/appUiConfigsSelectors';
 
-import { BIG_NUMBERS, MustBigNumber } from '@/lib/numbers';
-import { testFlags } from '@/lib/testFlags';
+import { BIG_NUMBERS, MaybeBigNumber, MustBigNumber } from '@/lib/numbers';
+import { orEmptyObj } from '@/lib/typeUtils';
 
 import { MidMarketPrice } from './MidMarketPrice';
 
@@ -51,40 +44,30 @@ enum MarketStats {
   MaxLeverage = 'MaxLeverage',
 }
 
-const defaultMarketStatistics = [
-  MarketStats.OraclePrice,
-  MarketStats.PriceChange24H,
-  MarketStats.OpenInterest,
-  MarketStats.Funding1H,
-  MarketStats.Volume24H,
-  MarketStats.Trades24H,
-  MarketStats.NextFunding,
-  MarketStats.MaxLeverage,
-];
-
 export const MarketStatsDetails = ({ showMidMarketPrice = true }: ElementProps) => {
   const stringGetter = useStringGetter();
   const { isTablet } = useBreakpoints();
 
-  const { tickSizeDecimals, initialMarginFraction, effectiveInitialMarginFraction } =
-    useAppSelector(getCurrentMarketConfig, shallowEqual) ?? {};
-  const midMarketPrice = useAppSelector(getCurrentMarketMidMarketPrice);
-  const lastMidMarketPrice = useRef(midMarketPrice);
-  const currentMarketData = useAppSelector(getCurrentMarketData, shallowEqual);
-  const isLoading = currentMarketData === undefined;
+  const marketData = useAppSelector(BonsaiHelpers.currentMarket.marketInfo);
+  const loadingState = useAppSelector(BonsaiCore.markets.markets.loading);
+  const isLoading = marketData == null && loadingState === 'pending';
 
-  const { uiRefresh } = testFlags;
-
-  const { oraclePrice, perpetual, priceChange24H, priceChange24HPercent, assetId } =
-    currentMarketData ?? {};
-
-  useEffect(() => {
-    lastMidMarketPrice.current = midMarketPrice;
-  }, [midMarketPrice]);
+  const {
+    displayableAsset,
+    effectiveInitialMarginFraction,
+    initialMarginFraction,
+    nextFundingRate,
+    openInterest,
+    openInterestUSDC,
+    oraclePrice,
+    percentChange24h,
+    priceChange24H,
+    tickSizeDecimals,
+    trades24H,
+    volume24H,
+  } = orEmptyObj(marketData);
 
   const displayUnit = useAppSelector(getSelectedDisplayUnit);
-
-  const { nextFundingRate, openInterest, openInterestUSDC, trades24H, volume24H } = perpetual ?? {};
 
   const valueMap = {
     [MarketStats.OraclePrice]: oraclePrice,
@@ -122,7 +105,7 @@ export const MarketStatsDetails = ({ showMidMarketPrice = true }: ElementProps) 
       )}
 
       <$Details
-        items={(uiRefresh ? Object.values(MarketStats) : defaultMarketStatistics).map((stat) => ({
+        items={Object.values(MarketStats).map((stat) => ({
           key: stat,
           label: labelMap[stat],
           tooltip: stat as unknown as TooltipStringKeys, // just force for now, component will handle non-existing ones
@@ -131,9 +114,9 @@ export const MarketStatsDetails = ({ showMidMarketPrice = true }: ElementProps) 
               value={valueMap[stat]}
               stat={stat}
               tickSizeDecimals={tickSizeDecimals}
-              assetId={assetId ?? ''}
+              assetId={displayableAsset ?? ''}
               isLoading={isLoading}
-              priceChange24HPercent={priceChange24HPercent}
+              priceChange24HPercent={percentChange24h}
               initialMarginFraction={initialMarginFraction}
               effectiveInitialMarginFraction={effectiveInitialMarginFraction}
               useFiatDisplayUnit={displayUnit === DisplayUnit.Fiat}
@@ -224,23 +207,31 @@ const DetailsItem = ({
   effectiveInitialMarginFraction,
   useFiatDisplayUnit,
 }: {
-  value: number | null | undefined;
+  value: string | number | null | undefined;
   stat: MarketStats;
   tickSizeDecimals: number | null | undefined;
   assetId: string;
   isLoading: boolean;
   priceChange24HPercent: number | null | undefined;
-  initialMarginFraction: number | null | undefined;
+  initialMarginFraction: string | null | undefined;
   effectiveInitialMarginFraction: number | null | undefined;
   useFiatDisplayUnit: boolean;
 }) => {
   const valueBN = MustBigNumber(value);
+  const stringGetter = useStringGetter();
 
   const color = valueBN.isNegative() ? 'var(--color-negative)' : 'var(--color-positive)';
 
   switch (stat) {
     case MarketStats.OraclePrice: {
-      return <$Output type={OutputType.Fiat} value={value} fractionDigits={tickSizeDecimals} />;
+      return (
+        <$Output
+          withSubscript
+          type={OutputType.Fiat}
+          value={value}
+          fractionDigits={tickSizeDecimals}
+        />
+      );
     }
     case MarketStats.OpenInterest: {
       return (
@@ -256,12 +247,28 @@ const DetailsItem = ({
     }
     case MarketStats.Funding1H: {
       return (
-        <$Output
-          type={OutputType.Percent}
-          value={value}
-          color={color}
-          fractionDigits={TINY_PERCENT_DECIMALS}
-        />
+        <WithTooltip
+          slotTooltip={
+            <dl>
+              <dd tw="flex">
+                {stringGetter({ key: STRING_KEYS.ANNUALIZED })}:
+                <Output
+                  tw="ml-0.25"
+                  type={OutputType.Percent}
+                  value={MustBigNumber(value).times(24 * 365)}
+                  fractionDigits={0}
+                />
+              </dd>
+            </dl>
+          }
+        >
+          <$Output
+            type={OutputType.Percent}
+            value={value}
+            color={!isLoading ? color : undefined}
+            fractionDigits={FUNDING_DECIMALS}
+          />
+        </WithTooltip>
       );
     }
     case MarketStats.NextFunding: {
@@ -271,7 +278,12 @@ const DetailsItem = ({
       return (
         <$RowSpan color={!isLoading ? color : undefined}>
           {!isLoading && <TriangleIndicator value={valueBN} />}
-          <$Output type={OutputType.Fiat} value={valueBN.abs()} fractionDigits={tickSizeDecimals} />
+          <$Output
+            withSubscript
+            type={OutputType.Fiat}
+            value={valueBN.abs()}
+            fractionDigits={tickSizeDecimals}
+          />
           {!isLoading && (
             <$Output
               type={OutputType.Percent}
@@ -298,7 +310,10 @@ const DetailsItem = ({
               ? BIG_NUMBERS.ONE.div(effectiveInitialMarginFraction)
               : null
           }
-          withDiff={initialMarginFraction !== effectiveInitialMarginFraction}
+          withDiff={
+            MaybeBigNumber(initialMarginFraction)?.toNumber() !==
+            (effectiveInitialMarginFraction ?? undefined)
+          }
           type={OutputType.Multiple}
         />
       );

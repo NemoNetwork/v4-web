@@ -1,8 +1,10 @@
 import { OrderSide } from '@nemo-network/v4-client-js/src';
+import { DateTime } from 'luxon';
 import {
-    ChartPropertiesOverrides,
-    TradingTerminalFeatureset,
-    TradingTerminalWidgetOptions,
+  ChartPropertiesOverrides,
+  Timezone,
+  TradingTerminalFeatureset,
+  TradingTerminalWidgetOptions,
 } from 'public/tradingview/charting_library';
 
 import { MetadataServiceCandlesResponse } from '@/constants/assetMetadata';
@@ -12,15 +14,14 @@ import type { ChartLineType } from '@/constants/tvchart';
 
 import { Themes } from '@/styles/themes';
 
-import { AppTheme, type AppColorMode } from '@/state/configs';
+import { AppTheme, type AppColorMode } from '@/state/appUiConfigs';
 
 import { getDisplayableTickerFromMarket } from '../assetUtils';
-import { testFlags } from '../testFlags';
 
-const MIN_NUM_TRADES_FOR_ORDERBOOK_PRICES = 10;
+// Show order book candles instead of trade candles if there are no trades in that time period
+const MAX_NUM_TRADES_FOR_ORDERBOOK_PRICES = 1;
 
 const getOhlcValues = ({
-  orderbookCandlesToggleOn,
   trades,
   tradeOpen,
   tradeClose,
@@ -29,7 +30,6 @@ const getOhlcValues = ({
   orderbookOpen,
   orderbookClose,
 }: {
-  orderbookCandlesToggleOn: boolean;
   trades: number;
   tradeOpen: number;
   tradeClose: number;
@@ -38,17 +38,16 @@ const getOhlcValues = ({
   orderbookOpen?: number;
   orderbookClose?: number;
 }) => {
-  const useOrderbookCandles =
-    orderbookCandlesToggleOn &&
-    trades <= MIN_NUM_TRADES_FOR_ORDERBOOK_PRICES &&
+  const showOrderbookCandles =
+    trades <= MAX_NUM_TRADES_FOR_ORDERBOOK_PRICES &&
     orderbookOpen !== undefined &&
     orderbookClose !== undefined;
 
   return {
-    low: useOrderbookCandles ? Math.min(orderbookOpen, orderbookClose) : tradeLow,
-    high: useOrderbookCandles ? Math.max(orderbookOpen, orderbookClose) : tradeHigh,
-    open: useOrderbookCandles ? orderbookOpen : tradeOpen,
-    close: useOrderbookCandles ? orderbookClose : tradeClose,
+    low: showOrderbookCandles ? Math.min(orderbookOpen, orderbookClose) : tradeLow,
+    high: showOrderbookCandles ? Math.max(orderbookOpen, orderbookClose) : tradeHigh,
+    open: showOrderbookCandles ? orderbookOpen : tradeOpen,
+    close: showOrderbookCandles ? orderbookClose : tradeClose,
   };
 };
 
@@ -65,65 +64,55 @@ export const mapMetadataServiceCandles = (
   };
 };
 
-export const mapCandle =
-  (orderbookCandlesToggleOn: boolean) =>
-  ({
-    startedAt,
-    open,
-    close,
-    high,
-    low,
-    baseTokenVolume,
-    usdVolume,
-    trades,
-    orderbookMidPriceOpen,
-    orderbookMidPriceClose,
-  }: Candle): TradingViewChartBar => {
-    const tradeOpen = parseFloat(open);
-    const tradeClose = parseFloat(close);
-    const tradeLow = parseFloat(low);
-    const tradeHigh = parseFloat(high);
-    const orderbookOpen = orderbookMidPriceOpen ? parseFloat(orderbookMidPriceOpen) : undefined;
-    const orderbookClose = orderbookMidPriceClose ? parseFloat(orderbookMidPriceClose) : undefined;
-    const tokenVolume = Math.ceil(Number(baseTokenVolume)); // default
-    return {
-      ...getOhlcValues({
-        orderbookCandlesToggleOn,
-        trades,
-        tradeOpen,
-        tradeClose,
-        tradeLow,
-        tradeHigh,
-        orderbookOpen,
-        orderbookClose,
-      }),
-      time: new Date(startedAt).getTime(),
-      volume: tokenVolume,
-      assetVolume: tokenVolume,
-      usdVolume: Math.ceil(Number(usdVolume)),
+export const mapCandle = ({
+  startedAt,
+  open,
+  close,
+  high,
+  low,
+  baseTokenVolume,
+  usdVolume,
+  trades,
+  orderbookMidPriceOpen,
+  orderbookMidPriceClose,
+}: Candle): TradingViewChartBar => {
+  const tradeOpen = parseFloat(open);
+  const tradeClose = parseFloat(close);
+  const tradeLow = parseFloat(low);
+  const tradeHigh = parseFloat(high);
+  const orderbookOpen = orderbookMidPriceOpen ? parseFloat(orderbookMidPriceOpen) : undefined;
+  const orderbookClose = orderbookMidPriceClose ? parseFloat(orderbookMidPriceClose) : undefined;
+  const tokenVolume = Math.ceil(Number(baseTokenVolume)); // default
+  return {
+    ...getOhlcValues({
+      trades,
       tradeOpen,
       tradeClose,
-      orderbookOpen,
-      orderbookClose,
       tradeLow,
       tradeHigh,
-      trades,
-    };
+      orderbookOpen,
+      orderbookClose,
+    }),
+    time: new Date(startedAt).getTime(),
+    volume: Math.ceil(Number(usdVolume)),
+    assetVolume: tokenVolume,
+    usdVolume: Math.ceil(Number(usdVolume)),
+    tradeOpen,
+    tradeClose,
+    orderbookOpen,
+    orderbookClose,
+    tradeLow,
+    tradeHigh,
+    trades,
   };
+};
 
-const mapTradingViewChartBar = ({
-  orderbookCandlesToggleOn,
-  bar,
-}: {
-  orderbookCandlesToggleOn: boolean;
-  bar: TradingViewChartBar;
-}): TradingViewChartBar => {
+const mapTradingViewChartBar = ({ bar }: { bar: TradingViewChartBar }): TradingViewChartBar => {
   const { trades, orderbookOpen, orderbookClose, tradeOpen, tradeClose, tradeLow, tradeHigh } = bar;
 
   return {
     ...bar,
     ...getOhlcValues({
-      orderbookCandlesToggleOn,
       trades,
       tradeOpen,
       tradeClose,
@@ -148,21 +137,17 @@ export const getHistorySlice = ({
   fromMs,
   toMs,
   firstDataRequest,
-  orderbookCandlesToggleOn,
 }: {
   bars?: TradingViewChartBar[];
   fromMs: number;
   toMs: number;
   firstDataRequest: boolean;
-  orderbookCandlesToggleOn: boolean;
 }): TradingViewChartBar[] => {
-  if (!bars || (!firstDataRequest && bars.length > 0 && toMs < bars[0].time)) {
+  if (!bars || (!firstDataRequest && bars.length > 0 && toMs < bars[0]!.time)) {
     return [];
   }
 
-  return bars
-    .map((bar) => mapTradingViewChartBar({ orderbookCandlesToggleOn, bar }))
-    .filter(({ time }) => time >= fromMs);
+  return bars.map((bar) => mapTradingViewChartBar({ bar })).filter(({ time }) => time >= fromMs);
 };
 
 export const getChartLineColors = ({
@@ -190,6 +175,8 @@ export const getChartLineColors = ({
     textButtonColor: theme.textButton,
   };
 };
+
+const timezone = DateTime.local().get('zoneName') as unknown as Timezone;
 
 export const getWidgetOverrides = ({
   appTheme,
@@ -242,8 +229,6 @@ export const getWidgetOverrides = ({
 export const getWidgetOptions = (
   isViewingUnlaunchedMarket?: boolean
 ): Partial<TradingTerminalWidgetOptions> & Pick<TradingTerminalWidgetOptions, 'container'> => {
-  const { uiRefresh } = testFlags;
-
   const disabledFeaturesForUnlaunchedMarket: TradingTerminalFeatureset[] = [
     'chart_scroll',
     'chart_zoom',
@@ -265,12 +250,11 @@ export const getWidgetOptions = (
     // debug: true,
     container: 'tv-price-chart',
     library_path: '/tradingview/', // relative to public folder
-    custom_css_url: uiRefresh
-      ? '/tradingview/custom-styles.css'
-      : '/tradingview/custom-styles-deprecated.css',
+    custom_css_url: '/tradingview/custom-styles.css',
     custom_font_family: "'Satoshi', system-ui, -apple-system, Helvetica, Arial, sans-serif",
     autosize: true,
     disabled_features: disabledFeatures,
+    timezone,
     enabled_features: [
       'remove_library_container_border',
       'hide_last_na_study_output',
