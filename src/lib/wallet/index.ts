@@ -5,7 +5,7 @@ import { STRING_KEYS, StringGetterFunction } from '@/constants/localization';
 import { WalletErrorType } from '@/constants/wallets';
 
 // Formatting
-export const truncateAddress = (address?: string, prefix: string = 'dydx') => {
+export const truncateAddress = (address?: string, prefix: string = 'nemo') => {
   if (!address) return '';
   const hash = address.replace(prefix, '');
   const firstHalf = hash.slice(0, 4);

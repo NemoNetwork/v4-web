@@ -177,7 +177,7 @@ export type PrivateInformation = ReturnType<typeof onboarding.deriveHDKeyFromEth
 
 export type EvmAddress = `0x${string}`;
 export type SolAddress = `${string}`;
-export type DydxAddress = `dydx${string}`;
+export type DydxAddress = `nemo${string}`;
 
 // Extension wallet EIP-6963 identifiers
 export const PHANTOM_MIPD_RDNS = 'app.phantom';
