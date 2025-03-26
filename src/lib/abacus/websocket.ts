@@ -88,6 +88,7 @@ class AbacusWebsocket implements Omit<AbacusWebsocketProtocol, '__doNotUseOrImpl
   private _initializeSocket = (): void => {
     if (!this.url || !this.connectedCallback || !this.receivedCallback) return;
     if ((this.socket != null && this.socket.readyState === WebSocket.OPEN) || this.isConnecting) {
+      console.log('socket already open');
       return;
     }
 
@@ -98,15 +99,18 @@ class AbacusWebsocket implements Omit<AbacusWebsocketProtocol, '__doNotUseOrImpl
     this.socket.onopen = () => {
       this.isConnecting = false;
       if (this.socket?.readyState === WebSocket.OPEN) {
+        console.log('socket open');
         this._setReconnectInterval();
 
         if (this.currentCandleId) {
+          console.log('handleCandlesSubscription', this.currentCandleId);
           this.handleCandlesSubscription({ channelId: this.currentCandleId, subscribe: true });
         }
       } else if (
         this.socket?.readyState === WebSocket.CLOSED ||
         this.socket?.readyState === WebSocket.CLOSING
       ) {
+        console.log('socket closed');
         this.socket = null;
       }
     };
@@ -116,6 +120,8 @@ class AbacusWebsocket implements Omit<AbacusWebsocketProtocol, '__doNotUseOrImpl
         const parsedMessage = JSON.parse(m.data);
 
         let shouldProcess = true;
+
+        console.log('onmessage', parsedMessage);
 
         switch (parsedMessage?.channel) {
           case 'v4_orderbook': {
@@ -215,11 +221,13 @@ class AbacusWebsocket implements Omit<AbacusWebsocketProtocol, '__doNotUseOrImpl
     if (this.reconnectTimer !== null) clearInterval(this.reconnectTimer);
 
     this.reconnectTimer = setInterval(() => {
+      console.log('reconnectTimer', this.socket?.readyState);
       if (
         !this.socket ||
         this.socket.readyState === WebSocket.CLOSED ||
         this.socket.readyState === WebSocket.CLOSING
       ) {
+        console.log('reconnectTimer clear');
         this._clearSocket();
         this._initializeSocket();
       }
