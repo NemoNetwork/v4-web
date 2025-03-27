@@ -20,7 +20,7 @@ jobs:
         cache: pnpm
 
     - run: |
-        pnpm install --ignore-scripts --frozen-lockfile
+        pnpm install
         tar -xzC public -f tradingview/tradingview.tgz # manually inline postinstall script
 
     - run: pnpm exec vitest run
