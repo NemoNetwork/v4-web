@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 
 import { OrderStatus } from '@/bonsai/types/summaryTypes';
 import { type Nullable } from '@dydxprotocol/v4-abacus';
-import { OrderFlags } from '@dydxprotocol/v4-client-js';
+import { OrderFlags } from '@nemo-network/v4-client-js/src';
 import styled from 'styled-components';
 
 import { ButtonShape, ButtonStyle } from '@/constants/buttons';

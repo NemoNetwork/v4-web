@@ -2,7 +2,7 @@
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { calculateFee, GasPrice, MsgTransferEncodeObject } from '@cosmjs/stargate';
-import { GAS_MULTIPLIER } from '@dydxprotocol/v4-client-js';
+import { GAS_MULTIPLIER } from '@nemo-network/v4-client-js/src';
 import { useAccount as useAccountGraz, useStargateSigningClient } from 'graz';
 import { type NumberFormatValues } from 'react-number-format';
 import { shallowEqual } from 'react-redux';

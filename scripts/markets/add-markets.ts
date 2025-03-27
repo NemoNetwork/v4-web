@@ -14,7 +14,7 @@ import {
   LocalWallet as LocalWalletType,
   Network,
   ValidatorConfig,
-} from '@dydxprotocol/v4-client-js';
+} from '@nemo-network/v4-client-js/src';
 import { readFileSync } from 'fs';
 import Long from 'long';
 
@@ -28,7 +28,7 @@ import {
 } from './help';
 
 const LocalWalletModule = await import(
-  '@dydxprotocol/v4-client-js/src/clients/modules/local-wallet'
+  '@nemo-network/v4-client-js/src/clients/modules/local-wallet'
 );
 const LocalWallet = LocalWalletModule.default;
 

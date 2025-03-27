@@ -9,7 +9,7 @@ import {
   Network,
   NetworkOptimizer,
   ValidatorConfig,
-} from '@dydxprotocol/v4-client-js';
+} from '@nemo-network/v4-client-js/src';
 
 import { DEFAULT_TRANSACTION_MEMO } from '@/constants/analytics';
 import {

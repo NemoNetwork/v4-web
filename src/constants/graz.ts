@@ -1,4 +1,4 @@
-import { BECH32_PREFIX, NOBLE_BECH32_PREFIX } from '@dydxprotocol/v4-client-js';
+import { BECH32_PREFIX, NOBLE_BECH32_PREFIX } from '@nemo-network/v4-client-js/src';
 import { WalletType as GrazWalletType, type ConfigureGrazArgs } from 'graz';
 
 import { getLocalStorage } from '@/lib/localStorage';

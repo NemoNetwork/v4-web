@@ -1,6 +1,6 @@
 import { getPositionBaseEquity } from '@/bonsai/calculators/subaccount';
 import { MarketInfo, SubaccountOrder, SubaccountPosition } from '@/bonsai/types/summaryTypes';
-import { OrderExecution, OrderFlags, OrderSide, OrderType } from '@dydxprotocol/v4-client-js';
+import { OrderExecution, OrderFlags, OrderSide, OrderType } from '@nemo-network/v4-client-js/src';
 import BigNumber from 'bignumber.js';
 
 import { timeUnits } from '@/constants/time';

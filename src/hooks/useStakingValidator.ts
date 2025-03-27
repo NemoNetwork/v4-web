@@ -4,7 +4,7 @@ import { BonsaiHooks } from '@/bonsai/ontology';
 import {
   BondStatus,
   Validator,
-} from '@dydxprotocol/v4-proto/src/codegen/cosmos/staking/v1beta1/staking';
+} from '@nemo-network/v4-proto/src/codegen/cosmos/staking/v1beta1/staking';
 import { useQuery } from '@tanstack/react-query';
 import { groupBy } from 'lodash';
 

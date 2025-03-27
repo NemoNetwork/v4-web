@@ -1,4 +1,4 @@
-import { ComplianceV2Response } from '@dydxprotocol/v4-client-js';
+import { ComplianceV2Response } from '@nemo-network/v4-client-js/src';
 
 import { DydxChainId, DydxNetwork, ENVIRONMENT_CONFIG_MAP } from '@/constants/networks';
 import { timeUnits } from '@/constants/time';

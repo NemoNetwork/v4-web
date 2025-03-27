@@ -14,7 +14,7 @@ import {
   UserFeeTier,
 } from '@/bonsai/types/summaryTypes';
 import { Coin } from '@cosmjs/proto-signing';
-import { HeightResponse } from '@dydxprotocol/v4-client-js';
+import { HeightResponse } from '@nemo-network/v4-client-js/src/clients/types';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { WritableDraft } from 'immer';
 

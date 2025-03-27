@@ -1,4 +1,4 @@
-import { ClobModule, ComplianceReason, FeeTierModule } from '@dydxprotocol/v4-client-js';
+import { ClobModule, ComplianceReason, FeeTierModule } from '@nemo-network/v4-client-js/src';
 import { type BigNumber } from 'bignumber.js';
 
 import {

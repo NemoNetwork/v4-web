@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
-import { OrderSide } from '@dydxprotocol/v4-client-js';
 import type { Story } from '@ladle/react';
+import { OrderSide } from '@nemo-network/v4-client-js/src/clients/constants';
 import styled from 'styled-components';
 
 import { PositionSide } from '@/constants/trade';

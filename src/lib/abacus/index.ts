@@ -1,5 +1,5 @@
 // eslint-disable-next-line import/no-cycle
-import type { LocalWallet, SelectedGasDenom } from '@dydxprotocol/v4-client-js';
+import { LocalWallet, SelectedGasDenom } from '@nemo-network/v4-client-js/src';
 
 import type {
   AbacusStateNotificationProtocol,

@@ -98,4 +98,9 @@ export default defineConfig(({ mode }) => ({
       input: entryPoints,
     },
   },
+  server: {
+    hmr: {
+      overlay: false
+    }
+  },
 }));

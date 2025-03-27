@@ -1,5 +1,5 @@
 // eslint-disable-next-line max-classes-per-file
-import { kollections } from '@dydxprotocol/v4-abacus';
+import { kollections } from '@nemo-network/v4-abacus';
 
 import type {
   AbacusNotification,

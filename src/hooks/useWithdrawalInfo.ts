@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 
-import { encodeJson } from '@dydxprotocol/v4-client-js';
-import { ByteArrayEncoding } from '@dydxprotocol/v4-client-js/build/src/lib/helpers';
+import { encodeJson } from '@nemo-network/v4-client-js/src';
+import { ByteArrayEncoding } from '@nemo-network/v4-client-js/src/lib/helpers';
 import { useQuery } from '@tanstack/react-query';
 import BigNumber from 'bignumber.js';
 

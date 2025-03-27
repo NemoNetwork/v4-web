@@ -1,4 +1,4 @@
-import { CompositeClient, IndexerClient } from '@dydxprotocol/v4-client-js';
+import { CompositeClient, IndexerClient } from '@nemo-network/v4-client-js/src';
 
 import { timeUnits } from '@/constants/time';
 

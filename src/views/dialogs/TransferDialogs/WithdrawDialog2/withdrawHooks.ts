@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 
-import { TYPE_URL_MSG_WITHDRAW_FROM_SUBACCOUNT } from '@dydxprotocol/v4-client-js';
+import { TYPE_URL_MSG_WITHDRAW_FROM_SUBACCOUNT } from '@nemo-network/v4-client-js/src';
 import { RouteResponse, UserAddress } from '@skip-go/client';
 import BigNumber from 'bignumber.js';
 import { initial } from 'lodash';

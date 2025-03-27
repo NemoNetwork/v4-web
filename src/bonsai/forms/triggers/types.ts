@@ -10,7 +10,7 @@ import {
   OrderSide,
   OrderTimeInForce,
   OrderType,
-} from '@dydxprotocol/v4-client-js';
+} from '@nemo-network/v4-client-js/src';
 
 export interface TriggerOrdersFormState {
   positionId?: PositionUniqueId;

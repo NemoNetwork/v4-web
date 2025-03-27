@@ -1,8 +1,7 @@
 import { SubaccountOrder as SubaccountOrderNew } from '@/bonsai/types/summaryTypes';
 import Abacus, { Nullable } from '@dydxprotocol/v4-abacus';
-import { OrderExecution } from '@dydxprotocol/v4-client-js';
-import { generateRandomClientId } from '@dydxprotocol/v4-client-js/build/src/lib/utils';
-import { ERRORS_STRING_KEYS } from '@dydxprotocol/v4-localization';
+import { OrderExecution } from '@nemo-network/v4-client-js/src';
+import { generateRandomClientId } from '@nemo-network/v4-client-js/src/lib/utils';
 
 import {
   AbacusOrderSide,

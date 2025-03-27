@@ -1,4 +1,4 @@
-import { HeightResponse } from '@dydxprotocol/v4-client-js';
+import { HeightResponse } from '@nemo-network/v4-client-js/src/clients/types';
 import { mapValues, maxBy, orderBy } from 'lodash';
 
 import { NUM_PARENT_SUBACCOUNTS } from '@/constants/account';

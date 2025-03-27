@@ -1,9 +1,7 @@
 import { createContext, useContext, useMemo } from 'react';
 
-import {
-  MsgWithdrawFromSubaccount,
-  TYPE_URL_MSG_WITHDRAW_FROM_SUBACCOUNT,
-} from '@dydxprotocol/v4-client-js';
+import { TYPE_URL_MSG_WITHDRAW_FROM_SUBACCOUNT } from '@nemo-network/v4-client-js/src/types';
+import { MsgWithdrawFromSubaccount } from '@nemo-network/v4-proto/src/codegen/nemo_network/sending/transfer';
 import { SkipClient } from '@skip-go/client';
 import { getWalletClient } from '@wagmi/core';
 import { WalletClient } from 'viem';

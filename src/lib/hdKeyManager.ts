@@ -1,5 +1,5 @@
 /* eslint-disable max-classes-per-file */
-import { LocalWallet } from '@dydxprotocol/v4-client-js';
+import { LocalWallet } from '@nemo-network/v4-client-js/src';
 
 import { Hdkey } from '@/constants/account';
 

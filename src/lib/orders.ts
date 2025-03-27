@@ -7,7 +7,7 @@ import {
   PerpetualMarketSummary,
   SubaccountFill as SubaccountFillNew,
 } from '@/bonsai/types/summaryTypes';
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide } from '@nemo-network/v4-client-js/src/clients/constants';
 import BigNumber from 'bignumber.js';
 
 import {

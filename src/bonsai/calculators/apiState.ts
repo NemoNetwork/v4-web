@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
-import { HeightResponse } from '@dydxprotocol/v4-client-js';
+import { HeightResponse } from '@nemo-network/v4-client-js/src/clients/types';
 
 import { timeUnits } from '@/constants/time';
 

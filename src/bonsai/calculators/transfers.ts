@@ -1,4 +1,4 @@
-import { MEGAVAULT_MODULE_ADDRESS } from '@dydxprotocol/v4-client-js';
+import { MEGAVAULT_MODULE_ADDRESS } from '@nemo-network/v4-client-js/src';
 import { keyBy, maxBy } from 'lodash';
 
 import { EMPTY_ARR } from '@/constants/objects';
