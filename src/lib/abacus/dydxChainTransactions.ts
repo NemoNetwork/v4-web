@@ -1,6 +1,6 @@
 import { EncodeObject } from '@cosmjs/proto-signing';
 import { type IndexedTx } from '@cosmjs/stargate';
-import Abacus, { type Nullable } from '@dydxprotocol/v4-abacus';
+import Abacus from '@dydxprotocol/v4-abacus';
 import {
   CompositeClient,
   GAS_MULTIPLIER,
@@ -17,10 +17,11 @@ import {
   encodeJson,
   type LocalWallet,
   type SelectedGasDenom,
-} from '@dydxprotocol/v4-client-js';
+} from '@nemo-network/v4-client-js/src';
 import Long from 'long';
 
 import {
+  Nullable,
   QueryType,
   QueryTypes,
   TransactionType,

@@ -5,7 +5,7 @@ import {
   selectNobleClientReady,
 } from '@/bonsai/socketSelectors';
 import { StargateClient } from '@cosmjs/stargate';
-import { CompositeClient, IndexerClient } from '@dydxprotocol/v4-client-js';
+import { CompositeClient, IndexerClient } from '@nemo-network/v4-client-js/src';
 import { QueryObserver, QueryObserverOptions, QueryObserverResult } from '@tanstack/react-query';
 
 import { timeUnits } from '@/constants/time';

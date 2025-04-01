@@ -12,7 +12,7 @@ import {
 // eslint-disable-next-line no-restricted-imports
 import { selectAllMarketsInfo } from '@/bonsai/selectors/markets';
 import { MarketsInfo } from '@/bonsai/types/summaryTypes';
-import { MEGAVAULT_MODULE_ADDRESS, PnlTickInterval } from '@dydxprotocol/v4-client-js';
+import { MEGAVAULT_MODULE_ADDRESS, PnlTickInterval } from '@nemo-network/v4-client-js/src';
 import { useQuery } from '@tanstack/react-query';
 import { throttle } from 'lodash';
 

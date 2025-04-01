@@ -1,6 +1,6 @@
 import React, { Dispatch, SetStateAction, useCallback, useMemo } from 'react';
 
-import { SelectedGasDenom } from '@dydxprotocol/v4-client-js';
+import { SelectedGasDenom } from '@nemo-network/v4-client-js/src/clients/constants';
 import { debounce } from 'lodash';
 import { type NumberFormatValues } from 'react-number-format';
 import styled from 'styled-components';

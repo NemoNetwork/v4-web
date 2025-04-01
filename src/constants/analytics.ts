@@ -1,4 +1,4 @@
-import { SupportedLocale } from '@dydxprotocol/v4-localization';
+import { SupportedLocale } from '@nemo-network/v4-localization';
 import { RouteResponse } from '@skip-go/client';
 import { RecordOf, TagsOf, UnionOf, ofType, unionize } from 'unionize';
 

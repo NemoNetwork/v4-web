@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { selectCompositeClientReady, selectIndexerReady } from '@/bonsai/socketSelectors';
-import { CompositeClient, IndexerClient } from '@dydxprotocol/v4-client-js';
+import { CompositeClient, IndexerClient } from '@nemo-network/v4-client-js/src';
 
 import { getSelectedNetwork } from '@/state/appSelectors';
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';

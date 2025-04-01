@@ -1,4 +1,4 @@
-import { GAS_MULTIPLIER, LocalWallet, NobleClient } from '@dydxprotocol/v4-client-js';
+import { GAS_MULTIPLIER, LocalWallet, NobleClient } from '@nemo-network/v4-client-js/src';
 import { CosmosTx, SkipClient, Tx } from '@skip-go/client';
 import { parseUnits } from 'viem';
 

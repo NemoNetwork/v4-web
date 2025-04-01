@@ -1,7 +1,7 @@
 name: CI
 
 on:
-  pull_request:
+  deployment_status:
 
 jobs:
   test:
@@ -10,17 +10,33 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up pnpm
-      uses: dydxprotocol/setup-pnpm@v2.0.0
+    - name: Install pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: 8
+        run_install: false
 
     - name: Set up Node
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: 18
-        cache: pnpm
+        cache: 'pnpm'
+        cache-dependency-path: '**/pnpm-lock.yaml'
 
-    - run: |
-        pnpm install --ignore-scripts --frozen-lockfile
-        tar -xzC public -f tradingview/tradingview.tgz # manually inline postinstall script
+    - name: Setup pnpm cache
+      uses: actions/cache@v3
+      with:
+        name: pnpm-store
+        path: ~/.local/share/pnpm/store
+        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-pnpm-store-
 
-    - run: pnpm exec vitest run
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+
+    - name: Extract TradingView
+      run: tar -xzC public -f tradingview/tradingview.tgz
+
+    - name: Run tests
+      run: pnpm exec vitest run

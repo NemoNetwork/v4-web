@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import { TradingRewardAggregationPeriod } from '@dydxprotocol/v4-client-js';
+// import { TradingRewardAggregationPeriod } from '@dydxprotocol/v4-client-js';
 import { useQuery } from '@tanstack/react-query';
 
 import { EMPTY_ARR } from '@/constants/objects';

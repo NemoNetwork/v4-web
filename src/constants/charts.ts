@@ -1,5 +1,6 @@
-import { Nullable } from '@dydxprotocol/v4-abacus';
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide } from '@nemo-network/v4-client-js/src/clients/constants';
+
+import { Nullable } from './abacus';
 
 export const TOGGLE_ACTIVE_CLASS_NAME = 'toggle-active';
 

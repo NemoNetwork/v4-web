@@ -1,6 +1,6 @@
-import type { Nullable, kollections } from '@dydxprotocol/v4-abacus';
+import type { kollections } from '@nemo-network/v4-abacus';
 
-import type { AbacusRestProtocol } from '@/constants/abacus';
+import type { AbacusRestProtocol, Nullable } from '@/constants/abacus';
 import { lastSuccessfulRestRequestByOrigin } from '@/constants/analytics';
 
 type Headers = Nullable<kollections.Map<string, string>>;

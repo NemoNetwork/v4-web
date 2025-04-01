@@ -1,4 +1,4 @@
-import { VaultModule } from '@dydxprotocol/v4-client-js';
+import { VaultModule } from '@nemo-network/v4-client-js/src';
 import { orderBy, sumBy } from 'lodash';
 
 import { IndexerTransferBetweenResponse, IndexerTransferType } from '@/types/indexer/indexerApiGen';

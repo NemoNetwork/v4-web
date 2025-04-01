@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 
-import { OrderSide } from '@dydxprotocol/v4-client-js';
+import { OrderSide } from '@nemo-network/v4-client-js/src/clients/constants';
 import { useMutation } from '@tanstack/react-query';
 import { isEmpty } from 'lodash';
 
