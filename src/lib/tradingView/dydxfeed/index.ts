@@ -1,3 +1,6 @@
+import { BonsaiHelpers } from '@/bonsai/ontology';
+// eslint-disable-next-line no-restricted-imports
+import { subscribeOnStream, unsubscribeFromStream } from '@/bonsai/websocket/candlesForTradingView';
 import { groupBy } from 'lodash';
 import { DateTime } from 'luxon';
 import type {
@@ -19,7 +22,6 @@ import type {
 import { Candle, RESOLUTION_MAP } from '@/constants/candles';
 import { StringGetterFunction, SupportedLocales } from '@/constants/localization';
 import { DEFAULT_MARKETID } from '@/constants/markets';
-import { DisplayUnit } from '@/constants/trade';
 
 import { useDydxClient } from '@/hooks/useDydxClient';
 
@@ -27,20 +29,13 @@ import { Themes } from '@/styles/themes';
 
 import { type RootStore } from '@/state/_store';
 import { getMarketFills } from '@/state/accountSelectors';
-import { getAppColorMode, getAppTheme } from '@/state/configsSelectors';
-import { setCandles } from '@/state/perpetuals';
-import {
-  getMarketConfig,
-  getMarketData,
-  getPerpetualBarsForPriceChart,
-} from '@/state/perpetualsSelectors';
+import { getAppColorMode, getAppTheme } from '@/state/appUiConfigsSelectors';
 
 import { objectKeys } from '@/lib/objectHelpers';
+import { orEmptyObj } from '@/lib/typeUtils';
 
 import { log } from '../../telemetry';
-import { getHistorySlice, getSymbol, mapCandle } from '../utils';
-import { lastBarsCache } from './cache';
-import { subscribeOnStream, unsubscribeFromStream } from './streaming';
+import { getSymbol, mapCandle } from '../utils';
 import { getMarkForOrderFills } from './utils';
 
 const timezone = DateTime.local().get('zoneName') as unknown as Timezone;
@@ -67,7 +62,6 @@ export const getDydxDatafeed = (
   store: RootStore,
   getCandlesForDatafeed: ReturnType<typeof useDydxClient>['getCandlesForDatafeed'],
   initialPriceScale: number | null,
-  orderbookCandlesToggleOn: boolean,
   localeSeparators: {
     group?: string;
     decimal?: string;
@@ -90,7 +84,9 @@ export const getDydxDatafeed = (
 
   resolveSymbol: async (symbolName: string, onSymbolResolvedCallback: ResolveCallback) => {
     const symbolItem = getSymbol(symbolName || DEFAULT_MARKETID);
-    const { tickSizeDecimals } = getMarketConfig(store.getState(), symbolItem.symbol) ?? {};
+    const { tickSizeDecimals } = orEmptyObj(
+      BonsaiHelpers.markets.createSelectMarketSummaryById()(store.getState(), symbolItem.symbol)
+    );
 
     const pricescale = tickSizeDecimals ? 10 ** tickSizeDecimals : initialPriceScale ?? 100;
 
@@ -129,18 +125,24 @@ export const getDydxDatafeed = (
     const colorMode = getAppColorMode(store.getState());
 
     const [fromMs, toMs] = [fromSeconds * 1000, toSeconds * 1000];
-    const market = getMarketData(store.getState(), symbolInfo.ticker!);
+    const market = BonsaiHelpers.markets.createSelectMarketSummaryById()(
+      store.getState(),
+      symbolInfo.ticker!
+    );
     if (!market) return;
 
     const fills = getMarketFills(store.getState())[symbolInfo.ticker!] ?? [];
     const inRangeFills = fills.filter(
-      (fill) => fill.createdAtMilliseconds >= fromMs && fill.createdAtMilliseconds <= toMs
+      (fill) =>
+        new Date(fill.createdAt ?? 0).getTime() >= fromMs &&
+        new Date(fill.createdAt ?? 0).getTime() <= toMs
     );
     const fillsByOrderId = groupBy(inRangeFills, 'orderId');
     const marks = Object.entries(fillsByOrderId).map(([orderId, orderFills]) =>
       getMarkForOrderFills(
         store,
         orderFills,
+        market.stepSizeDecimals,
         orderId,
         fromMs,
         resolution,
@@ -165,80 +167,34 @@ export const getDydxDatafeed = (
     onHistoryCallback: HistoryCallback,
     onErrorCallback: ErrorCallback
   ) => {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (!symbolInfo) return;
 
-    const { countBack, from, to, firstDataRequest } = periodParams;
+    // TODO: technically we should be prioritizing countBack over the from+to since it really wants at least that many bars
+    const { from, to } = periodParams;
     const fromMs = from * 1000;
-    let toMs = to * 1000;
-
-    // Add 1ms to the toMs to ensure that today's candle is included
-    if (firstDataRequest && resolution === '1D') {
-      toMs += 1;
-    }
+    // add one to make sure we get current day for 1d view
+    const toMs = to * 1000 + 1;
 
     try {
-      const currentMarketBars = getPerpetualBarsForPriceChart(orderbookCandlesToggleOn)(
-        store.getState(),
-        symbolInfo.ticker!,
-        resolution
-      );
-
-      // Retrieve candles in the store that are between fromMs and toMs
-      const cachedBars = getHistorySlice({
-        bars: currentMarketBars,
+      const fetchedCandles: Candle[] | undefined = await getCandlesForDatafeed({
+        marketId: symbolInfo.ticker!,
+        resolution,
         fromMs,
         toMs,
-        firstDataRequest,
-        orderbookCandlesToggleOn,
       });
 
-      let fetchedCandles: Candle[] | undefined;
-
-      // If there are not enough candles in the store, retrieve more from the API
-      if (cachedBars.length < countBack) {
-        const earliestCachedBarTime = cachedBars?.[cachedBars.length - 1]?.time;
-
-        fetchedCandles = await getCandlesForDatafeed({
-          marketId: symbolInfo.ticker!,
-          resolution,
-          fromMs,
-          toMs: earliestCachedBarTime || toMs,
-        });
-
-        store.dispatch(
-          setCandles({ candles: fetchedCandles, marketId: symbolInfo.ticker!, resolution })
-        );
-      }
-
-      const volumeUnit = store.getState().configs.displayUnit;
-
-      const bars = [
-        ...cachedBars,
-        ...(fetchedCandles?.map(mapCandle(orderbookCandlesToggleOn)) ?? []),
-      ]
-        .map((bar) => ({
-          ...bar,
-          volume: volumeUnit === DisplayUnit.Fiat ? bar.usdVolume : bar.assetVolume,
-        }))
-        .reverse();
+      const bars = fetchedCandles.map(mapCandle).reverse();
 
       if (bars.length === 0) {
         onHistoryCallback([], {
           noData: true,
         });
-
-        return;
-      }
-
-      if (firstDataRequest) {
-        lastBarsCache.set(`${symbolInfo.ticker}/${RESOLUTION_MAP[resolution]}`, {
-          ...bars[bars.length - 1],
+      } else {
+        onHistoryCallback(bars, {
+          noData: false,
         });
       }
-
-      onHistoryCallback(bars, {
-        noData: false,
-      });
     } catch (error) {
       log('tradingView/dydxfeed/getBars', error);
       onErrorCallback(error);
@@ -252,14 +208,13 @@ export const getDydxDatafeed = (
     listenerGuid: string,
     onResetCacheNeededCallback: Function
   ) => {
-    onResetCacheNeededCallback();
     subscribeOnStream({
+      store,
       symbolInfo,
       resolution,
       onRealtimeCallback: onTick,
       listenerGuid,
       onResetCacheNeededCallback,
-      lastBar: lastBarsCache.get(`${symbolInfo.ticker}/${RESOLUTION_MAP[resolution]}`),
     });
   },
 

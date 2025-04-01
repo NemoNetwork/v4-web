@@ -1,3 +1,4 @@
+import { BonsaiHelpers } from '@/bonsai/ontology';
 import { shallowEqual } from 'react-redux';
 import styled from 'styled-components';
 
@@ -10,10 +11,13 @@ import { layoutMixins } from '@/styles/layoutMixins';
 import { AssetIcon } from '@/components/AssetIcon';
 import { PositionTile } from '@/views/PositionTile';
 
-import { getCurrentMarketPositionData } from '@/state/accountSelectors';
+import {
+  getCurrentMarketPositionData,
+  getCurrentMarketPositionDataForPostTrade,
+} from '@/state/accountSelectors';
 import { useAppSelector } from '@/state/appTypes';
-import { getCurrentMarketAssetData } from '@/state/assetsSelectors';
-import { getCurrentMarketData } from '@/state/perpetualsSelectors';
+
+import { orEmptyObj } from '@/lib/typeUtils';
 
 type ElementProps = {
   showNarrowVariation?: boolean;
@@ -22,16 +26,23 @@ type ElementProps = {
 export const PositionPreview = ({ showNarrowVariation }: ElementProps) => {
   const stringGetter = useStringGetter();
 
-  const { id } = useAppSelector(getCurrentMarketAssetData, shallowEqual) ?? {};
-  const { configs } = useAppSelector(getCurrentMarketData, shallowEqual) ?? {};
-  const { size: positionSize, notionalTotal } =
-    useAppSelector(getCurrentMarketPositionData, shallowEqual) ?? {};
-  const { stepSizeDecimals, tickSizeDecimals } = configs ?? {};
+  const {
+    stepSizeDecimals,
+    tickSizeDecimals,
+    assetId: id,
+    logo: imageUrl,
+  } = orEmptyObj(useAppSelector(BonsaiHelpers.currentMarket.marketInfo));
+  const { signedSize: positionSize, notional: notionalTotal } = orEmptyObj(
+    useAppSelector(getCurrentMarketPositionData, shallowEqual)
+  );
+  const { size: positionSizePostOrder } = orEmptyObj(
+    useAppSelector(getCurrentMarketPositionDataForPostTrade)
+  );
 
   return (
     <$PositionPreviewContainer>
       <$YourPosition>
-        {!showNarrowVariation && <AssetIcon symbol={id} />}
+        {!showNarrowVariation && <AssetIcon logoUrl={imageUrl} symbol={id} />}
         <span>
           {stringGetter({
             key: STRING_KEYS.YOUR_MARKET_POSITION,
@@ -42,9 +53,10 @@ export const PositionPreview = ({ showNarrowVariation }: ElementProps) => {
         </span>
       </$YourPosition>
       <PositionTile
-        currentSize={positionSize?.current}
-        notionalTotal={notionalTotal?.current}
-        postOrderSize={positionSize?.postOrder}
+        assetImgUrl={imageUrl}
+        currentSize={positionSize?.toNumber()}
+        notionalTotal={notionalTotal?.toNumber()}
+        postOrderSize={positionSizePostOrder?.postOrder}
         stepSizeDecimals={stepSizeDecimals}
         symbol={id}
         tickSizeDecimals={tickSizeDecimals}
@@ -68,9 +80,7 @@ const $YourPosition = styled.div`
   ${layoutMixins.inlineRow}
   color: var(--color-text-0);
 
-  > img {
-    height: 1.75em;
-  }
+  --asset-icon-size: 1.75em;
 
   strong {
     font-weight: normal;

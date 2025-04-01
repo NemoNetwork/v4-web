@@ -1,6 +1,10 @@
 /* eslint-disable react/no-unstable-nested-components */
-import { DialogTypes } from '@/constants/dialogs';
+import React from 'react';
 
+import { DialogTypes } from '@/constants/dialogs';
+import { isMainnet } from '@/constants/networks';
+
+import { CriteriaDialog } from '@/views/Affiliates/CriteriaDialog';
 import { AcknowledgeTermsDialog } from '@/views/dialogs/AcknowledgeTermsDialog';
 import { AdjustIsolatedMarginDialog } from '@/views/dialogs/AdjustIsolatedMarginDialog';
 import { AdjustTargetLeverageDialog } from '@/views/dialogs/AdjustTargetLeverageDialog';
@@ -8,6 +12,7 @@ import { CancelAllOrdersConfirmationDialog } from '@/views/dialogs/CancelAllOrde
 import { CancelPendingOrdersDialog } from '@/views/dialogs/CancelPendingOrdersDialog';
 import { CloseAllPositionsConfirmationDialog } from '@/views/dialogs/CloseAllPositionsConfirmationDialog';
 import { ClosePositionDialog } from '@/views/dialogs/ClosePositionDialog';
+import { CoinbaseDepositDialog } from '@/views/dialogs/CoinbaseDepositDialog';
 import { ComplianceConfigDialog } from '@/views/dialogs/ComplianceConfigDialog';
 import { ConfirmPendingDepositDialog } from '@/views/dialogs/ConfirmPendingDepositDialog';
 import { DepositDialog } from '@/views/dialogs/DepositDialog';
@@ -22,13 +27,10 @@ import { ExternalNavStrideDialog } from '@/views/dialogs/ExternalNavStrideDialog
 import { GeoComplianceDialog } from '@/views/dialogs/GeoComplianceDialog';
 import { GlobalCommandDialog } from '@/views/dialogs/GlobalCommandDialog';
 import { HelpDialog } from '@/views/dialogs/HelpDialog';
-import { LaunchMarketDialog } from '@/views/dialogs/LaunchMarketDialog';
 import { ManageFundsDialog } from '@/views/dialogs/ManageFundsDialog';
 import { MnemonicExportDialog } from '@/views/dialogs/MnemonicExportDialog';
 import { MobileDownloadDialog } from '@/views/dialogs/MobileDownloadDialog';
 import { MobileSignInDialog } from '@/views/dialogs/MobileSignInDialog';
-import { NewMarketAgreementDialog } from '@/views/dialogs/NewMarketAgreementDialog';
-import { NewMarketMessageDetailsDialog } from '@/views/dialogs/NewMarketMessageDetailsDialog';
 import { OnboardingDialog } from '@/views/dialogs/OnboardingDialog';
 import { PredictionMarketIntroDialog } from '@/views/dialogs/PredictionMarketIntroDialog';
 import { PreferencesDialog } from '@/views/dialogs/PreferencesDialog';
@@ -41,8 +43,12 @@ import { ShareAffiliateDialog } from '@/views/dialogs/ShareAffiliateDialog';
 import { SharePNLAnalyticsDialog } from '@/views/dialogs/SharePNLAnalyticsDialog';
 import { StakeDialog } from '@/views/dialogs/StakeDialog';
 import { StakingRewardDialog } from '@/views/dialogs/StakingRewardDialog';
+import { TestnetFaucetDialog } from '@/views/dialogs/TestnetFaucetDialog';
 import { TradeDialog } from '@/views/dialogs/TradeDialog';
 import { TransferDialog } from '@/views/dialogs/TransferDialog';
+import { DepositDialog2 } from '@/views/dialogs/TransferDialogs/DepositDialog2/DepositDialog2';
+import { TransferStatusDialog } from '@/views/dialogs/TransferDialogs/TransferStatusDialog';
+import { WithdrawDialog2 } from '@/views/dialogs/TransferDialogs/WithdrawDialog2/WithdrawDialog2';
 import { TriggersDialog } from '@/views/dialogs/TriggersDialog';
 import { UnstakeDialog } from '@/views/dialogs/UnstakeDialog';
 import { VaultDepositWithdrawDialog } from '@/views/dialogs/VaultDepositWithdrawDialog';
@@ -53,7 +59,7 @@ import { useAppDispatch, useAppSelector } from '@/state/appTypes';
 import { closeDialog, openDialog } from '@/state/dialogs';
 import { getActiveDialog } from '@/state/dialogsSelectors';
 
-export const DialogManager = () => {
+export const DialogManager = React.memo(() => {
   const dispatch = useAppDispatch();
   const activeDialog = useAppSelector(getActiveDialog);
 
@@ -77,9 +83,16 @@ export const DialogManager = () => {
       <CancelAllOrdersConfirmationDialog {...args} {...modalProps} />
     ),
     CancelPendingOrders: (args) => <CancelPendingOrdersDialog {...args} {...modalProps} />,
+    CoinbaseDepositDialog: (args) => <CoinbaseDepositDialog {...args} {...modalProps} />,
     ComplianceConfig: (args) => <ComplianceConfigDialog {...args} {...modalProps} />,
     ConfirmPendingDeposit: (args) => <ConfirmPendingDepositDialog {...args} {...modalProps} />,
     Deposit: (args) => <DepositDialog {...args} {...modalProps} />,
+    Deposit2: (args) =>
+      isMainnet ? (
+        <DepositDialog2 {...args} {...modalProps} />
+      ) : (
+        <TestnetFaucetDialog {...modalProps} />
+      ),
     DisconnectWallet: (args) => <DisconnectDialog {...args} {...modalProps} />,
     DisplaySettings: (args) => <DisplaySettingsDialog {...args} {...modalProps} />,
     ExchangeOffline: (args) => <ExchangeOfflineDialog {...args} {...modalProps} />,
@@ -90,13 +103,10 @@ export const DialogManager = () => {
     GlobalCommand: (args) => <GlobalCommandDialog {...args} {...modalProps} />,
     Help: (args) => <HelpDialog {...args} {...modalProps} />,
     ExternalNavKeplr: (args) => <ExternalNavKeplrDialog {...args} {...modalProps} />,
-    LaunchMarket: (args) => <LaunchMarketDialog {...args} {...modalProps} />,
     ManageFunds: (args) => <ManageFundsDialog {...args} {...modalProps} />,
     MnemonicExport: (args) => <MnemonicExportDialog {...args} {...modalProps} />,
     MobileDownload: (args) => <MobileDownloadDialog {...args} {...modalProps} />,
     MobileSignIn: (args) => <MobileSignInDialog {...args} {...modalProps} />,
-    NewMarketAgreement: (args) => <NewMarketAgreementDialog {...args} {...modalProps} />,
-    NewMarketMessageDetails: (args) => <NewMarketMessageDetailsDialog {...args} {...modalProps} />,
     Onboarding: (args) => <OnboardingDialog {...args} {...modalProps} />,
     OrderDetails: (args) => <OrderDetailsDialog {...args} {...modalProps} />,
     PredictionMarketIntro: (args) => <PredictionMarketIntroDialog {...args} {...modalProps} />,
@@ -113,9 +123,12 @@ export const DialogManager = () => {
     Trade: (args) => <TradeDialog {...args} {...modalProps} />,
     Triggers: (args) => <TriggersDialog {...args} {...modalProps} />,
     Transfer: (args) => <TransferDialog {...args} {...modalProps} />,
+    TransferStatus: (args) => <TransferStatusDialog {...args} {...modalProps} />,
     Unstake: (args) => <UnstakeDialog {...args} {...modalProps} />,
     VaultDepositWithdraw: (args) => <VaultDepositWithdrawDialog {...args} {...modalProps} />,
     Withdraw: (args) => <WithdrawDialog {...args} {...modalProps} />,
+    Withdraw2: (args) => <WithdrawDialog2 {...args} {...modalProps} />,
     WithdrawalGated: (args) => <WithdrawalGateDialog {...args} {...modalProps} />,
+    Criteria: (args) => <CriteriaDialog {...args} {...modalProps} />,
   });
-};
+});

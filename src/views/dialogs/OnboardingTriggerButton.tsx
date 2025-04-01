@@ -1,6 +1,6 @@
 import { OnboardingState } from '@/constants/account';
 import { AnalyticsEvents } from '@/constants/analytics';
-import { ButtonAction, ButtonSize } from '@/constants/buttons';
+import { ButtonAction, ButtonSize, ButtonType } from '@/constants/buttons';
 import { DialogTypes } from '@/constants/dialogs';
 import { STRING_KEYS } from '@/constants/localization';
 
@@ -9,6 +9,7 @@ import { useStringGetter } from '@/hooks/useStringGetter';
 
 import { Button } from '@/components/Button';
 
+import { calculateIsAccountViewOnly } from '@/state/accountCalculators';
 import { getOnboardingState } from '@/state/accountSelectors';
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
 import { forceOpenDialog } from '@/state/dialogs';
@@ -40,26 +41,32 @@ export const OnboardingTriggerButton = ({
     );
     dispatch(forceOpenDialog(DialogTypes.Onboarding()));
   };
-  const { disableConnectButton } = useComplianceState();
 
+  const { disableConnectButton } = useComplianceState();
   const onboardingState = useAppSelector(getOnboardingState);
+  const isAccountViewOnly = useAppSelector(calculateIsAccountViewOnly);
 
   return (
     <Button
       className={className}
       action={ButtonAction.Primary}
       size={size}
+      type={ButtonType.Button}
       state={{
-        isDisabled: disableConnectButton,
+        isDisabled:
+          disableConnectButton ||
+          (onboardingState === OnboardingState.AccountConnected && isAccountViewOnly),
       }}
       onClick={openOnboardingDialog}
     >
-      {
-        {
-          [OnboardingState.Disconnected]: stringGetter({ key: STRING_KEYS.CONNECT_WALLET }),
-          [OnboardingState.WalletConnected]: stringGetter({ key: STRING_KEYS.RECOVER_KEYS }),
-        }[onboardingState as string]
-      }
+      {onboardingState === OnboardingState.AccountConnected
+        ? isAccountViewOnly
+          ? stringGetter({ key: STRING_KEYS.UNAVAILABLE })
+          : stringGetter({ key: STRING_KEYS.CONNECT_WALLET })
+        : {
+            [OnboardingState.Disconnected]: stringGetter({ key: STRING_KEYS.CONNECT_WALLET }),
+            [OnboardingState.WalletConnected]: stringGetter({ key: STRING_KEYS.RECOVER_KEYS }),
+          }[onboardingState as string]}
     </Button>
   );
 };

@@ -1,5 +1,6 @@
-import { Ref, useEffect } from 'react';
+import { Ref, useEffect, useState } from 'react';
 
+import { BonsaiHelpers } from '@/bonsai/ontology';
 import { NumberFormatValues, SourceInfo } from 'react-number-format';
 import { shallowEqual } from 'react-redux';
 import styled from 'styled-components';
@@ -21,19 +22,17 @@ import { WithTooltip } from '@/components/WithTooltip';
 
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
 import { setTradeFormInputs } from '@/state/inputs';
-import { getTradeFormInputs, useTradeFormData } from '@/state/inputsSelectors';
-import {
-  getCurrentMarketConfig,
-  getCurrentMarketMidMarketPrice,
-} from '@/state/perpetualsSelectors';
+import { getInputTradeData, getTradeFormInputs, useTradeFormData } from '@/state/inputsSelectors';
 
 import { MustBigNumber } from '@/lib/numbers';
+import { orEmptyObj } from '@/lib/typeUtils';
 
 type TradeBoxInputConfig = {
   key: TradeBoxKeys;
   inputType: InputType;
   label: React.ReactNode;
   onChange: (values: NumberFormatValues, e: SourceInfo) => void;
+  onInput?: () => void;
   ref?: Ref<HTMLInputElement>;
   validationConfig?: InputErrorData;
   value: string | number;
@@ -48,18 +47,30 @@ export const TradeFormInputs = () => {
   const { needsLimitPrice, needsTrailingPercent, needsTriggerPrice } = useTradeFormData();
   const tradeFormInputValues = useAppSelector(getTradeFormInputs, shallowEqual);
   const { limitPriceInput, triggerPriceInput, trailingPercentInput } = tradeFormInputValues;
-  const { tickSizeDecimals } = useAppSelector(getCurrentMarketConfig, shallowEqual) ?? {};
-  const midMarketPrice = useAppSelector(getCurrentMarketMidMarketPrice, shallowEqual);
+  const { marketId, type } = orEmptyObj(useAppSelector(getInputTradeData, shallowEqual));
+  const { tickSizeDecimals } = orEmptyObj(
+    useAppSelector(BonsaiHelpers.currentMarket.stableMarketInfo)
+  );
+
+  const midMarketPrice = useAppSelector(BonsaiHelpers.currentMarket.midPrice.data)?.toNumber();
+  const [hasSetMidMarketLimit, setHasSetMidMarketLimit] = useState(false);
+
+  useEffect(() => {
+    setHasSetMidMarketLimit(false);
+  }, [marketId, type?.rawValue]);
 
   useEffect(() => {
     // when limit price input is empty and mid price is available, set limit price input to mid price
-    if (!midMarketPrice || !needsLimitPrice || limitPriceInput !== '') return;
+    if (!midMarketPrice || !needsLimitPrice || hasSetMidMarketLimit) {
+      return;
+    }
     dispatch(
       setTradeFormInputs({
         limitPriceInput: MustBigNumber(midMarketPrice).toFixed(tickSizeDecimals ?? USD_DECIMALS),
       })
     );
-  }, [dispatch, limitPriceInput, midMarketPrice, needsLimitPrice, tickSizeDecimals]);
+    setHasSetMidMarketLimit(true);
+  }, [dispatch, midMarketPrice, needsLimitPrice, tickSizeDecimals, marketId, hasSetMidMarketLimit]);
 
   const onMidMarketPriceClick = () => {
     if (!midMarketPrice) return;
@@ -135,13 +146,24 @@ export const TradeFormInputs = () => {
   }
 
   return tradeFormInputs.map(
-    ({ key, inputType, label, onChange, validationConfig, value, decimals, slotRight }) => (
+    ({
+      key,
+      inputType,
+      label,
+      onChange,
+      onInput,
+      validationConfig,
+      value,
+      decimals,
+      slotRight,
+    }) => (
       <FormInput
         key={key}
         id={key}
         type={inputType}
         label={label}
         onChange={onChange}
+        onInput={onInput}
         validationConfig={validationConfig}
         value={value}
         decimals={decimals}

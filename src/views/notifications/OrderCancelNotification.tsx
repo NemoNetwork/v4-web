@@ -1,6 +1,7 @@
-import { shallowEqual } from 'react-redux';
+import { BonsaiHelpers } from '@/bonsai/ontology';
+import { OrderStatus } from '@/bonsai/types/summaryTypes';
 
-import { AbacusOrderStatus } from '@/constants/abacus';
+import { AbacusOrderStatus, TRADE_TYPES_NEW } from '@/constants/abacus';
 import { STRING_KEYS } from '@/constants/localization';
 import { CancelOrderStatuses, LocalCancelOrderData, ORDER_TYPE_STRINGS } from '@/constants/trade';
 
@@ -14,10 +15,8 @@ import { LoadingSpinner } from '@/components/Loading/LoadingSpinner';
 import { Notification, NotificationProps } from '@/components/Notification';
 
 import { getOrderById } from '@/state/accountSelectors';
-import { useAppSelector } from '@/state/appTypes';
-import { getMarketData } from '@/state/perpetualsSelectors';
 
-import { getTradeType } from '@/lib/orders';
+import { orEmptyObj } from '@/lib/typeUtils';
 
 import { OrderStatusIcon } from '../OrderStatusIcon';
 
@@ -32,11 +31,13 @@ export const OrderCancelNotification = ({
 }: NotificationProps & ElementProps) => {
   const stringGetter = useStringGetter();
   const order = useParameterizedSelector(getOrderById, localCancel.orderId)!;
-  const marketData = useAppSelector((s) => getMarketData(s, order.marketId), shallowEqual);
-  const { assetId } = marketData ?? {};
-  const tradeType = getTradeType(order.type.rawValue) ?? undefined;
-  const orderTypeKey = tradeType && ORDER_TYPE_STRINGS[tradeType]?.orderTypeKey;
-  const indexedOrderStatus = order.status.rawValue;
+  const { assetId, logo: logoUrl } = orEmptyObj(
+    useParameterizedSelector(BonsaiHelpers.markets.createSelectMarketSummaryById, order.marketId)
+  );
+
+  const tradeType = TRADE_TYPES_NEW[order.type] ?? undefined;
+  const orderTypeKey = tradeType && ORDER_TYPE_STRINGS[tradeType].orderTypeKey;
+  const indexedOrderStatus = order.status;
   const cancelStatus = localCancel.submissionStatus;
 
   let orderStatusStringKey = STRING_KEYS.CANCELING;
@@ -45,9 +46,8 @@ export const OrderCancelNotification = ({
 
   // show Canceled if either canceled confirmation happens (node / indexer)
   // note: indexer status is further processed by abacus, but PartiallyCanceled = CANCELED
-  const isPartiallyCanceled = indexedOrderStatus === AbacusOrderStatus.PartiallyCanceled.rawValue;
-  const isCancelFinalized =
-    indexedOrderStatus === AbacusOrderStatus.Canceled.rawValue || isPartiallyCanceled;
+  const isPartiallyCanceled = indexedOrderStatus === OrderStatus.PartiallyCanceled;
+  const isCancelFinalized = indexedOrderStatus === OrderStatus.Canceled || isPartiallyCanceled;
 
   if (cancelStatus === CancelOrderStatuses.Canceled || isCancelFinalized) {
     orderStatusStringKey = isPartiallyCanceled
@@ -78,7 +78,7 @@ export const OrderCancelNotification = ({
     <Notification
       isToast={isToast}
       notification={notification}
-      slotIcon={<AssetIcon symbol={assetId} />}
+      slotIcon={<AssetIcon logoUrl={logoUrl} symbol={assetId} />}
       slotTitle={orderTypeKey && stringGetter({ key: orderTypeKey })}
       slotTitleRight={
         <span tw="row gap-[0.5ch] text-color-text-0 font-small-book">

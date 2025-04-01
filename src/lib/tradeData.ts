@@ -136,7 +136,7 @@ export const getTradeInputAlert = ({
     }
   );
 
-  return inputAlerts?.[0];
+  return inputAlerts[0];
 };
 
 export const calculateCrossPositionMargin = ({
@@ -171,14 +171,18 @@ export const getPositionMargin = ({ position }: { position: SubaccountPosition }
   const margin =
     marginMode === AbacusMarginMode.Cross
       ? calculateCrossPositionMargin({
-          notionalTotal: notionalTotal?.current,
+          notionalTotal: notionalTotal.current,
           adjustedImf: adjustedImf.current,
         })
-      : equity?.current;
+      : equity.current;
 
   return margin;
 };
 
 export const getTradeStateWithDoubleValuesHasDiff = (tradeState: Nullable<TradeState<number>>) => {
   return !!tradeState && tradeState.current !== tradeState.postOrder;
+};
+
+export const getDoubleValuesHasDiff = (current: Nullable<number>, post: Nullable<number>) => {
+  return post != null && current !== post;
 };
