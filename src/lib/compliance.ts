@@ -7,6 +7,10 @@ import { DydxAddress } from '@/constants/wallets';
 
 import { getLocalStorage, setLocalStorage } from '@/lib/localStorage';
 
+import { stringifyTransactionError } from './errors';
+import { hdKeyManager } from './hdKeyManager';
+import { log } from './telemetry';
+
 type KeplrComplianceStorage = {
   version?: string;
   [address: DydxAddress]: {
@@ -15,19 +19,19 @@ type KeplrComplianceStorage = {
   };
 };
 
-export const signComplianceSignature = async (
+const signComplianceSignature = async (
   message: string,
   action: string,
   status: string,
   hdkey: Hdkey
 ): Promise<{ signedMessage: string; timestamp: number }> => {
-  if (!hdkey?.privateKey || !hdkey?.publicKey) {
+  if (!hdkey.privateKey || !hdkey.publicKey) {
     throw new Error('Missing hdkey');
   }
 
   const timestampInSeconds = Math.floor(Date.now() / 1000);
   const messageToSign: string = `${message}:${action}"${status || ''}:${timestampInSeconds}`;
-  const messageHash = sha256(Buffer.from(messageToSign));
+  const messageHash = sha256(new TextEncoder().encode(messageToSign));
 
   const signed = await Secp256k1.createSignature(messageHash, hdkey.privateKey);
   const signedMessage = signed.toFixedLength();
@@ -37,7 +41,7 @@ export const signComplianceSignature = async (
   };
 };
 
-export const signComplianceSignatureKeplr = async (
+const signComplianceSignatureKeplr = async (
   message: string,
   signer: DydxAddress,
   chainId: string
@@ -48,6 +52,7 @@ export const signComplianceSignatureKeplr = async (
 
   const stored = getLocalStorage<KeplrComplianceStorage>({
     key: LocalStorageKey.KeplrCompliance,
+    defaultValue: {},
   });
 
   const storedSignature = stored[signer]?.signature;
@@ -77,6 +82,49 @@ export const signComplianceSignatureKeplr = async (
     signedMessage: signature,
     pubKey: pubKey.value,
   };
+};
+
+export const signCompliancePayload = async (
+  address: string,
+  params: {
+    message: string;
+    action: string;
+    status: string;
+    chainId: string;
+  }
+): Promise<string> => {
+  try {
+    const hdkey = hdKeyManager.getHdkey(address);
+    if (hdkey?.privateKey && hdkey.publicKey) {
+      const { signedMessage, timestamp } = await signComplianceSignature(
+        params.message,
+        params.action,
+        params.status,
+        hdkey
+      );
+      return JSON.stringify({
+        signedMessage,
+        publicKey: Buffer.from(hdkey.publicKey).toString('base64'),
+        timestamp,
+      });
+    }
+    if (window.keplr && params.chainId && address) {
+      const { signedMessage, pubKey } = await signComplianceSignatureKeplr(
+        params.message,
+        address as DydxAddress,
+        params.chainId
+      );
+      return JSON.stringify({
+        signedMessage,
+        publicKey: pubKey,
+        isKeplr: true,
+      });
+    }
+    throw new Error('Missing hdkey');
+  } catch (error) {
+    log('DydxChainTransactions/signComplianceMessage', error);
+    return stringifyTransactionError(error);
+  }
 };
 
 export const isBlockedGeo = (geo: string): boolean => {

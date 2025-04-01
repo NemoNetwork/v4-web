@@ -4,7 +4,7 @@ import { isDev } from '@/constants/networks';
 import { track } from './analytics/analytics';
 import { dd } from './analytics/datadog';
 
-export const log = (location: string, error: Error, metadata?: object) => {
+export const log = (location: string, error?: Error, metadata?: object) => {
   if (isDev) {
     // eslint-disable-next-line no-console
     console.warn('telemetry/log:', { location, error, metadata });
@@ -29,6 +29,15 @@ export const log = (location: string, error: Error, metadata?: object) => {
   dd.error(`[Error] ${location}`, metadata, error);
 
   globalThis.dispatchEvent(customEvent);
+};
+
+export const logInfo = (location: string, metadata?: object) => {
+  if (isDev) {
+    // eslint-disable-next-line no-console
+    console.log('telemetry/logInfo:', { location, metadata });
+  }
+
+  dd.info(`[Info] ${location}`, metadata);
 };
 
 // Log rejected Promises without a .catch() handler

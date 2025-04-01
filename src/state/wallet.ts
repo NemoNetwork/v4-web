@@ -3,13 +3,21 @@ import { createSlice } from '@reduxjs/toolkit';
 
 import { WalletInfo, WalletNetworkType } from '@/constants/wallets';
 
+export type SourceAccount = {
+  address?: string;
+  chain?: WalletNetworkType;
+  encryptedSignature?: string;
+  walletInfo?: WalletInfo;
+};
+
+// NOTE: This app slice is persisted via redux-persist. Changes to this type may require migrations.
 export interface WalletState {
-  sourceAccount: {
+  sourceAccount: SourceAccount;
+  localWallet?: {
     address?: string;
-    chain?: WalletNetworkType;
-    encryptedSignature?: string;
-    walletInfo?: WalletInfo;
+    subaccountNumber?: number;
   };
+  localWalletNonce?: number;
 }
 
 const initialState: WalletState = {
@@ -19,12 +27,20 @@ const initialState: WalletState = {
     encryptedSignature: undefined,
     walletInfo: undefined,
   },
+  localWallet: {
+    address: undefined,
+    subaccountNumber: 0,
+  },
+  localWalletNonce: undefined,
 };
 
 export const walletSlice = createSlice({
   name: 'wallet',
   initialState,
   reducers: {
+    setLocalWalletNonce: (state, action: PayloadAction<number | undefined>) => {
+      state.localWalletNonce = action.payload;
+    },
     setSourceAddress: (
       state,
       action: PayloadAction<{ address: string; chain: WalletNetworkType }>
@@ -55,6 +71,12 @@ export const walletSlice = createSlice({
     clearSavedEncryptedSignature: (state) => {
       state.sourceAccount.encryptedSignature = undefined;
     },
+    setLocalWallet: (
+      state,
+      { payload }: PayloadAction<{ address?: string; subaccountNumber?: number }>
+    ) => {
+      state.localWallet = payload;
+    },
     clearSourceAccount: (state) => {
       state.sourceAccount = {
         address: undefined,
@@ -67,9 +89,11 @@ export const walletSlice = createSlice({
 });
 
 export const {
+  setLocalWalletNonce,
   setSourceAddress,
   setWalletInfo,
   setSavedEncryptedSignature,
   clearSavedEncryptedSignature,
   clearSourceAccount,
+  setLocalWallet,
 } = walletSlice.actions;

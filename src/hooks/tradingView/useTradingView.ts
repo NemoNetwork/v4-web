@@ -1,5 +1,6 @@
 import React, { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useState } from 'react';
 
+import { BonsaiHelpers } from '@/bonsai/ontology';
 import BigNumber from 'bignumber.js';
 import isEmpty from 'lodash/isEmpty';
 import {
@@ -11,16 +12,15 @@ import {
 
 import { DEFAULT_RESOLUTION } from '@/constants/candles';
 import { TOGGLE_ACTIVE_CLASS_NAME } from '@/constants/charts';
-import { STRING_KEYS, SUPPORTED_LOCALE_BASE_TAGS } from '@/constants/localization';
-import { tooltipStrings } from '@/constants/tooltips';
+import { STRING_KEYS, SUPPORTED_LOCALE_MAP } from '@/constants/localization';
 import type { TvWidget } from '@/constants/tvchart';
 
 import { store } from '@/state/_store';
 import { getSelectedNetwork } from '@/state/appSelectors';
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
-import { getAppColorMode, getAppTheme } from '@/state/configsSelectors';
+import { getAppColorMode, getAppTheme } from '@/state/appUiConfigsSelectors';
+import { getCurrentMarketId } from '@/state/currentMarketSelectors';
 import { getSelectedLocale } from '@/state/localizationSelectors';
-import { getCurrentMarketConfig, getCurrentMarketId } from '@/state/perpetualsSelectors';
 import { updateChartConfig } from '@/state/tradingView';
 import { getTvChartConfig } from '@/state/tradingViewSelectors';
 
@@ -30,42 +30,32 @@ import { orEmptyObj } from '@/lib/typeUtils';
 
 import { useDydxClient } from '../useDydxClient';
 import { useLocaleSeparators } from '../useLocaleSeparators';
-import { useAllStatsigGateValues } from '../useStatsig';
 import { useStringGetter } from '../useStringGetter';
-import { useURLConfigs } from '../useURLConfigs';
 import { useTradingViewLimitOrder } from './useTradingViewLimitOrder';
 
 /**
  * @description Hook to initialize TradingView Chart
  */
 export const useTradingView = ({
-  tvWidgetRef,
+  tvWidget,
+  setTvWidget,
   orderLineToggleRef,
   orderLinesToggleOn,
   setOrderLinesToggleOn,
-  orderbookCandlesToggleRef,
-  orderbookCandlesToggleOn,
-  setOrderbookCandlesToggleOn,
   buySellMarksToggleRef,
   buySellMarksToggleOn,
   setBuySellMarksToggleOn,
-  setIsChartReady,
 }: {
-  tvWidgetRef: React.MutableRefObject<TvWidget | null>;
+  tvWidget?: TvWidget;
+  setTvWidget: Dispatch<SetStateAction<TvWidget | undefined>>;
   orderLineToggleRef: React.MutableRefObject<HTMLElement | null>;
   orderLinesToggleOn: boolean;
   setOrderLinesToggleOn: Dispatch<SetStateAction<boolean>>;
-  orderbookCandlesToggleRef: React.MutableRefObject<HTMLElement | null>;
-  orderbookCandlesToggleOn: boolean;
-  setOrderbookCandlesToggleOn: Dispatch<SetStateAction<boolean>>;
   buySellMarksToggleRef: React.MutableRefObject<HTMLElement | null>;
   buySellMarksToggleOn: boolean;
   setBuySellMarksToggleOn: Dispatch<SetStateAction<boolean>>;
-  setIsChartReady: React.Dispatch<React.SetStateAction<boolean>>;
 }) => {
   const stringGetter = useStringGetter();
-  const urlConfigs = useURLConfigs();
-  const featureFlags = useAllStatsigGateValues();
   const dispatch = useAppDispatch();
 
   const { group, decimal } = useLocaleSeparators();
@@ -90,7 +80,7 @@ export const useTradingView = ({
     [marketId: string]: number | undefined;
   }>({});
   const { tickSizeDecimals: tickSizeDecimalsAbacus } = orEmptyObj(
-    useAppSelector(getCurrentMarketConfig)
+    useAppSelector(BonsaiHelpers.currentMarket.stableMarketInfo)
   );
   const tickSizeDecimals =
     (marketId
@@ -100,20 +90,20 @@ export const useTradingView = ({
   const initializeToggle = useCallback(
     ({
       toggleRef,
-      tvWidget,
+      widget,
       isOn,
       setToggleOn,
       label,
       tooltip,
     }: {
       toggleRef: React.MutableRefObject<HTMLElement | null>;
-      tvWidget: TvWidget;
+      widget: TvWidget;
       isOn: boolean;
       setToggleOn: Dispatch<SetStateAction<boolean>>;
       label: string;
       tooltip: string;
     }) => {
-      toggleRef.current = tvWidget.createButton();
+      toggleRef.current = widget.createButton();
       toggleRef.current.innerHTML = `<span>${label}</span> <div class="toggle"></div>`;
       toggleRef.current.setAttribute('title', tooltip);
       if (isOn) {
@@ -141,13 +131,12 @@ export const useTradingView = ({
   const tradingViewLimitOrder = useTradingViewLimitOrder(marketId, tickSizeDecimals);
 
   useEffect(() => {
-    if (marketId && tickSizeDecimals !== undefined) {
+    if (marketId && tickSizeDecimals !== undefined && !tvWidget) {
       const widgetOptions = getWidgetOptions();
       const widgetOverrides = getWidgetOverrides({ appTheme, appColorMode });
+      const languageCode = SUPPORTED_LOCALE_MAP[selectedLocale].baseTag;
 
-      const initialPriceScale = BigNumber(10)
-        .exponentiatedBy(tickSizeDecimals ?? 2)
-        .toNumber();
+      const initialPriceScale = BigNumber(10).exponentiatedBy(tickSizeDecimals).toNumber();
       const options: TradingTerminalWidgetOptions = {
         ...widgetOptions,
         ...widgetOverrides,
@@ -155,95 +144,68 @@ export const useTradingView = ({
           store,
           getCandlesForDatafeed,
           initialPriceScale,
-          orderbookCandlesToggleOn,
           { decimal, group },
           selectedLocale,
           stringGetter
         ),
         interval: (savedResolution ?? DEFAULT_RESOLUTION) as ResolutionString,
-        locale: SUPPORTED_LOCALE_BASE_TAGS[selectedLocale] as LanguageCode,
+        locale: languageCode as LanguageCode,
         symbol: marketId,
         saved_data: !isEmpty(savedTvChartConfig) ? savedTvChartConfig : undefined,
         auto_save_delay: 1,
       };
 
       const tvChartWidget = new Widget(options);
-      tvWidgetRef.current = tvChartWidget;
+      setTvWidget(tvChartWidget);
 
       tvChartWidget.onChartReady(() => {
         // Initialize additional right-click-menu options
-        tvWidgetRef.current?.onContextMenu(tradingViewLimitOrder);
+        tvChartWidget.onContextMenu(tradingViewLimitOrder);
 
-        tvWidgetRef.current?.headerReady().then(() => {
-          if (tvWidgetRef.current) {
-            // Order Lines
-            initializeToggle({
-              toggleRef: orderLineToggleRef,
-              tvWidget: tvWidgetRef.current,
-              isOn: orderLinesToggleOn,
-              setToggleOn: setOrderLinesToggleOn,
-              label: stringGetter({
-                key: STRING_KEYS.ORDER_LINES,
-              }),
-              tooltip: stringGetter({
-                key: STRING_KEYS.ORDER_LINES_TOOLTIP,
-              }),
-            });
+        tvChartWidget.headerReady().then(() => {
+          // Order Lines
+          initializeToggle({
+            toggleRef: orderLineToggleRef,
+            widget: tvChartWidget,
+            isOn: orderLinesToggleOn,
+            setToggleOn: setOrderLinesToggleOn,
+            label: stringGetter({
+              key: STRING_KEYS.ORDER_LINES,
+            }),
+            tooltip: stringGetter({
+              key: STRING_KEYS.ORDER_LINES_TOOLTIP,
+            }),
+          });
 
-            // Orderbook Candles (OHLC)
-            const getOhlcTooltipString = tooltipStrings.ohlc;
-            const { title: ohlcTitle, body: ohlcBody } = getOhlcTooltipString({
-              stringGetter,
-              stringParams: {},
-              urlConfigs,
-              featureFlags,
-            });
-
-            initializeToggle({
-              toggleRef: orderbookCandlesToggleRef,
-              tvWidget: tvWidgetRef.current,
-              isOn: orderbookCandlesToggleOn,
-              setToggleOn: setOrderbookCandlesToggleOn,
-              label: `${ohlcTitle}*`,
-              tooltip: ohlcBody as string,
-            });
-
-            // Buy/Sell Marks
-            initializeToggle({
-              toggleRef: buySellMarksToggleRef,
-              tvWidget: tvWidgetRef.current,
-              isOn: buySellMarksToggleOn,
-              setToggleOn: setBuySellMarksToggleOn,
-              label: stringGetter({
-                key: STRING_KEYS.BUYS_SELLS_TOGGLE,
-              }),
-              tooltip: stringGetter({
-                key: STRING_KEYS.BUYS_SELLS_TOGGLE_TOOLTIP,
-              }),
-            });
-          }
+          // Buy/Sell Marks
+          initializeToggle({
+            toggleRef: buySellMarksToggleRef,
+            widget: tvChartWidget,
+            isOn: buySellMarksToggleOn,
+            setToggleOn: setBuySellMarksToggleOn,
+            label: stringGetter({
+              key: STRING_KEYS.BUYS_SELLS_TOGGLE,
+            }),
+            tooltip: stringGetter({
+              key: STRING_KEYS.BUYS_SELLS_TOGGLE_TOOLTIP,
+            }),
+          });
         });
 
-        tvWidgetRef?.current?.subscribe('onAutoSaveNeeded', () =>
-          tvWidgetRef?.current?.save((chartConfig: object) => {
+        tvChartWidget.subscribe('onAutoSaveNeeded', () =>
+          tvChartWidget.save((chartConfig: object) => {
             dispatch(updateChartConfig(chartConfig));
           })
         );
-
-        setIsChartReady(true);
       });
     }
 
     return () => {
       orderLineToggleRef.current?.remove();
       orderLineToggleRef.current = null;
-      orderbookCandlesToggleRef.current?.remove();
-      orderbookCandlesToggleRef.current = null;
       buySellMarksToggleRef.current?.remove();
       buySellMarksToggleRef.current = null;
-      tvWidgetRef.current?.remove();
-      tvWidgetRef.current = null;
-      setIsChartReady(false);
+      tvWidget?.remove();
     };
   }, [
     selectedLocale,
@@ -251,14 +213,10 @@ export const useTradingView = ({
     !!marketId,
     tickSizeDecimals !== undefined,
     orderLineToggleRef,
-    orderbookCandlesToggleRef,
     buySellMarksToggleRef,
     setBuySellMarksToggleOn,
     setOrderLinesToggleOn,
-    setOrderbookCandlesToggleOn,
-    orderbookCandlesToggleOn,
-    tvWidgetRef,
+    tvWidget,
+    setTvWidget,
   ]);
-
-  return { savedResolution };
 };

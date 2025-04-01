@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useLogin, useLogout, useMfa, useMfaEnrollment, usePrivy } from '@privy-io/react-auth';
 import {
@@ -42,7 +42,14 @@ export const useWalletConnection = () => {
 
   const { address: evmAddressWagmi, isConnected: isConnectedWagmi } = useAccountWagmi();
   const publicClientWagmi = usePublicClientWagmi();
-  const { data: signerWagmi } = useWalletClientWagmi();
+  const { data: signerWagmi, refetch } = useWalletClientWagmi();
+
+  useEffect(() => {
+    if (isConnectedWagmi && !signerWagmi) {
+      refetch();
+    }
+  }, [isConnectedWagmi, signerWagmi, refetch]);
+
   const { disconnectAsync: disconnectWagmi } = useDisconnectWagmi();
   const selectedDydxChainId = useAppSelector(getSelectedDydxChainId);
 
@@ -82,9 +89,7 @@ export const useWalletConnection = () => {
     async (chainId: string) => {
       if (isConnectedGraz) {
         const keplr = window.keplr;
-
         const offlineSigner = await keplr?.getOfflineSigner(chainId);
-
         return offlineSigner;
       }
 
@@ -98,7 +103,10 @@ export const useWalletConnection = () => {
     sourceAccount.walletInfo
   );
 
-  const walletConnectConfig = WALLETS_CONFIG_MAP[selectedDydxChainId].walletconnect;
+  const walletConnectConfig = useMemo(
+    () => WALLETS_CONFIG_MAP[selectedDydxChainId].walletconnect,
+    [selectedDydxChainId]
+  );
 
   const { connectAsync: connectWagmi } = useConnectWagmi();
   const { reconnectAsync: reconnectWagmi } = useReconnectWagmi();
@@ -172,7 +180,7 @@ export const useWalletConnection = () => {
               // Currently the only usecase for this is piping in EIP specified error codes.
               // There's a nonzero chance of overlap so we should watch out for this
               code: error.code,
-              connectorType: wallet?.connectorType,
+              connectorType: wallet.connectorType,
             }
           );
         }

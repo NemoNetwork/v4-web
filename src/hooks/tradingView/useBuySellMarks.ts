@@ -3,9 +3,9 @@ import { useEffect } from 'react';
 import { TOGGLE_ACTIVE_CLASS_NAME } from '@/constants/charts';
 import { TvWidget } from '@/constants/tvchart';
 
-import { getMarketFills } from '@/state/accountSelectors';
+import { getIsAccountConnected, getMarketFills } from '@/state/accountSelectors';
 import { useAppSelector } from '@/state/appTypes';
-import { getCurrentMarketId } from '@/state/perpetualsSelectors';
+import { getCurrentMarketId } from '@/state/currentMarketSelectors';
 
 import { useAppThemeAndColorModeContext } from '../useAppThemeAndColorMode';
 
@@ -16,36 +16,46 @@ export function useBuySellMarks({
   buySellMarksToggle,
   buySellMarksToggleOn,
   tvWidget,
-  isChartReady,
 }: {
   buySellMarksToggle: HTMLElement | null;
   buySellMarksToggleOn: boolean;
-  tvWidget: TvWidget | null;
-  isChartReady: boolean;
+  tvWidget?: TvWidget;
 }) {
   const marketId = useAppSelector(getCurrentMarketId);
   const fills = useAppSelector(getMarketFills);
   const currentMarketFills = marketId ? fills[marketId] : undefined;
 
+  const isAccountConnected = useAppSelector(getIsAccountConnected);
   const theme = useAppThemeAndColorModeContext();
 
   useEffect(
     // Update marks on toggle and on new fills and on display preference changes
     () => {
-      if (!isChartReady || !tvWidget) return;
+      if (!tvWidget) return;
 
       tvWidget.onChartReady(() => {
         tvWidget.headerReady().then(() => {
           if (buySellMarksToggleOn) {
-            buySellMarksToggle?.classList?.add(TOGGLE_ACTIVE_CLASS_NAME);
+            buySellMarksToggle?.classList.add(TOGGLE_ACTIVE_CLASS_NAME);
+          } else {
+            buySellMarksToggle?.classList.remove(TOGGLE_ACTIVE_CLASS_NAME);
+          }
+
+          if (buySellMarksToggleOn && isAccountConnected) {
             tvWidget.activeChart().refreshMarks();
           } else {
-            buySellMarksToggle?.classList?.remove(TOGGLE_ACTIVE_CLASS_NAME);
             tvWidget.activeChart().clearMarks();
           }
         });
       });
     },
-    [buySellMarksToggleOn, buySellMarksToggle, tvWidget, isChartReady, currentMarketFills, theme]
+    [
+      buySellMarksToggleOn,
+      isAccountConnected,
+      buySellMarksToggle,
+      tvWidget,
+      currentMarketFills,
+      theme,
+    ]
   );
 }

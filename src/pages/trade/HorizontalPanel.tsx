@@ -1,10 +1,11 @@
 import { useCallback, useMemo, useState } from 'react';
 
-import { shallowEqual } from 'react-redux';
+import { BonsaiCore } from '@/bonsai/ontology';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 
 import { STRING_KEYS } from '@/constants/localization';
+import { EMPTY_ARR } from '@/constants/objects';
 import { AppRoute } from '@/constants/routes';
 
 import { useBreakpoints } from '@/hooks/useBreakpoints';
@@ -12,16 +13,10 @@ import { useParameterizedSelector } from '@/hooks/useParameterizedSelector';
 import { useShouldShowTriggers } from '@/hooks/useShouldShowTriggers';
 import { useStringGetter } from '@/hooks/useStringGetter';
 
-import { formMixins } from '@/styles/formMixins';
-
-import { AssetIcon } from '@/components/AssetIcon';
 import { CollapsibleTabs } from '@/components/CollapsibleTabs';
 import { LoadingSpinner } from '@/components/Loading/LoadingSpinner';
-import { SelectItem, SelectMenu } from '@/components/SelectMenu';
-import { VerticalSeparator } from '@/components/Separator';
 import { MobileTabs } from '@/components/Tabs';
 import { Tag, TagType } from '@/components/Tag';
-import { ToggleGroup } from '@/components/ToggleGroup';
 import { PositionInfo } from '@/views/PositionInfo';
 import { FillsTable, FillsTableColumnKey } from '@/views/tables/FillsTable';
 import { OrdersTable, OrdersTableColumnKey } from '@/views/tables/OrdersTable';
@@ -32,47 +27,41 @@ import {
   calculateShouldRenderActionsInPositionsTable,
 } from '@/state/accountCalculators';
 import {
-  getCurrentMarketTradeInfoNumbers,
-  getHasUnseenFillUpdates,
-  getHasUnseenOrderUpdates,
-  getTradeInfoNumbers,
+  createGetOpenOrdersCount,
+  createGetUnseenFillsCount,
+  createGetUnseenOpenOrdersCount,
+  createGetUnseenOrderHistoryCount,
 } from '@/state/accountSelectors';
 import { useAppSelector } from '@/state/appTypes';
-import { getDefaultToAllMarketsInPositionsOrdersFills } from '@/state/configsSelectors';
+import { getDefaultToAllMarketsInPositionsOrdersFills } from '@/state/appUiConfigsSelectors';
+import { getCurrentMarketId } from '@/state/currentMarketSelectors';
 import { getHasUncommittedOrders } from '@/state/localOrdersSelectors';
-import { getCurrentMarketAssetId, getCurrentMarketId } from '@/state/perpetualsSelectors';
 
-import { getSimpleStyledOutputType } from '@/lib/genericFunctionalComponentUtils';
 import { isTruthy } from '@/lib/isTruthy';
 import { shortenNumberForDisplay } from '@/lib/numbers';
-import { testFlags } from '@/lib/testFlags';
 
+import { TradeTableSettings } from './TradeTableSettings';
 import { MaybeUnopenedIsolatedPositionsDrawer } from './UnopenedIsolatedPositions';
-import { MarketTypeFilter } from './types';
+import { MarketTypeFilter, PanelView } from './types';
 
 enum InfoSection {
   Position = 'Position',
   Orders = 'Orders',
+  OrderHistory = 'OrderHistory',
   Fills = 'Fills',
   Payments = 'Payments',
-}
-
-enum PanelView {
-  AllMarkets = 'AllMarkets',
-  CurrentMarket = 'CurrentMarket',
 }
 
 type ElementProps = {
   isOpen?: boolean;
   setIsOpen?: (isOpen: boolean) => void;
+  handleStartResize?: (e: React.MouseEvent<HTMLElement>) => void;
 };
 
-export const HorizontalPanel = ({ isOpen = true, setIsOpen }: ElementProps) => {
+export const HorizontalPanel = ({ isOpen = true, setIsOpen, handleStartResize }: ElementProps) => {
   const stringGetter = useStringGetter();
   const navigate = useNavigate();
-  const { isTablet, isDesktopSmall } = useBreakpoints();
-
-  const { uiRefresh } = testFlags;
+  const { isTablet } = useBreakpoints();
 
   const allMarkets = useAppSelector(getDefaultToAllMarketsInPositionsOrdersFills);
   const [view, setView] = useState<PanelView>(
@@ -82,32 +71,47 @@ export const HorizontalPanel = ({ isOpen = true, setIsOpen }: ElementProps) => {
   const [tab, setTab] = useState<InfoSection>(InfoSection.Position);
 
   const currentMarketId = useAppSelector(getCurrentMarketId);
-  const currentMarketAssetId = useAppSelector(getCurrentMarketAssetId);
 
-  const { numTotalPositions, numTotalOpenOrders, numTotalUnseenFills } =
-    useAppSelector(getTradeInfoNumbers, shallowEqual) ?? {};
-
-  const { numOpenOrders, numUnseenFills } =
-    useAppSelector(getCurrentMarketTradeInfoNumbers, shallowEqual) ?? {};
-
-  const hasUnseenOrderUpdates = useAppSelector(getHasUnseenOrderUpdates);
-  const hasUnseenFillUpdates = useAppSelector(getHasUnseenFillUpdates);
+  const areFillsLoading = useAppSelector(BonsaiCore.account.fills.loading) === 'pending';
   const isAccountViewOnly = useAppSelector(calculateIsAccountViewOnly);
+
   const shouldRenderTriggers = useShouldShowTriggers();
   const shouldRenderActions = useParameterizedSelector(
     calculateShouldRenderActionsInPositionsTable
   );
   const isWaitingForOrderToIndex = useAppSelector(getHasUncommittedOrders);
+  const areOrdersLoading = useAppSelector(BonsaiCore.account.openOrders.loading) === 'pending';
   const showCurrentMarket = isTablet || view === PanelView.CurrentMarket;
-
-  const fillsTagNumber = shortenNumberForDisplay(
-    showCurrentMarket ? numUnseenFills : numTotalUnseenFills
+  const numUnseenOrderHistory = useParameterizedSelector(
+    createGetUnseenOrderHistoryCount,
+    showCurrentMarket ? currentMarketId : undefined
   );
-  const ordersTagNumber = shortenNumberForDisplay(
-    showCurrentMarket ? numOpenOrders : numTotalOpenOrders
-  );
+  const orderHistoryTagNumber = shortenNumberForDisplay(numUnseenOrderHistory);
 
-  const initialPageSize = 10;
+  const openOrdersCount = useParameterizedSelector(
+    createGetOpenOrdersCount,
+    showCurrentMarket ? currentMarketId : undefined
+  );
+  const unseenOpenOrdersCount = useParameterizedSelector(
+    createGetUnseenOpenOrdersCount,
+    showCurrentMarket ? currentMarketId : undefined
+  );
+  const ordersTagNumber = shortenNumberForDisplay(openOrdersCount);
+
+  const numTotalPositions = (
+    useAppSelector(BonsaiCore.account.parentSubaccountPositions.data) ?? EMPTY_ARR
+  ).length;
+
+  const numUnseenFills = useParameterizedSelector(
+    createGetUnseenFillsCount,
+    showCurrentMarket ? currentMarketId : undefined
+  );
+  const fillsTagNumber = shortenNumberForDisplay(numUnseenFills);
+
+  const hasUnseenOrderUpdates = unseenOpenOrdersCount > 0;
+  const hasUnseenFillUpdates = numUnseenFills > 0;
+
+  const initialPageSize = 20;
 
   const onViewOrders = useCallback(
     (market: string) => {
@@ -137,26 +141,24 @@ export const HorizontalPanel = ({ isOpen = true, setIsOpen }: ElementProps) => {
         <PositionsTable
           currentMarket={showCurrentMarket ? currentMarketId : undefined}
           marketTypeFilter={viewIsolated}
-          columnKeys={
-            isTablet
-              ? [
-                  PositionsTableColumnKey.Details,
-                  PositionsTableColumnKey.IndexEntry,
-                  PositionsTableColumnKey.PnL,
-                ]
-              : [
-                  PositionsTableColumnKey.Market,
-                  PositionsTableColumnKey.Size,
-                  PositionsTableColumnKey.Margin,
-                  PositionsTableColumnKey.UnrealizedPnl,
-                  !isDesktopSmall && PositionsTableColumnKey.RealizedPnl,
-                  PositionsTableColumnKey.NetFunding,
-                  PositionsTableColumnKey.AverageOpenAndClose,
-                  PositionsTableColumnKey.LiquidationAndOraclePrice,
-                  shouldRenderTriggers && PositionsTableColumnKey.Triggers,
-                  shouldRenderActions && PositionsTableColumnKey.Actions,
-                ].filter(isTruthy)
-          }
+          columnKeys={[
+            PositionsTableColumnKey.Market,
+            PositionsTableColumnKey.Leverage,
+            PositionsTableColumnKey.Type,
+            PositionsTableColumnKey.Size,
+            PositionsTableColumnKey.Value,
+            PositionsTableColumnKey.PnL,
+            PositionsTableColumnKey.Margin,
+            PositionsTableColumnKey.AverageOpen,
+            PositionsTableColumnKey.Oracle,
+            PositionsTableColumnKey.Liquidation,
+            PositionsTableColumnKey.NetFunding,
+            shouldRenderTriggers && PositionsTableColumnKey.Triggers,
+            shouldRenderActions && PositionsTableColumnKey.Actions,
+          ].filter(isTruthy)}
+          columnWidths={{
+            [PositionsTableColumnKey.Actions]: 80,
+          }}
           showClosePositionAction={shouldRenderActions}
           initialPageSize={initialPageSize}
           navigateToOrders={onViewOrders}
@@ -169,7 +171,6 @@ export const HorizontalPanel = ({ isOpen = true, setIsOpen }: ElementProps) => {
       viewIsolated,
       showCurrentMarket,
       isTablet,
-      isDesktopSmall,
       shouldRenderActions,
       shouldRenderTriggers,
       numTotalPositions,
@@ -181,22 +182,24 @@ export const HorizontalPanel = ({ isOpen = true, setIsOpen }: ElementProps) => {
     () => ({
       asChild: true,
       value: InfoSection.Orders,
-      label: stringGetter({ key: STRING_KEYS.ORDERS }),
+      label: stringGetter({ key: STRING_KEYS.OPEN_ORDERS_HEADER }),
 
-      slotRight: isWaitingForOrderToIndex ? (
-        <LoadingSpinner tw="[--spinner-width:1rem]" />
-      ) : (
-        ordersTagNumber && (
-          <Tag type={TagType.Number} isHighlighted={hasUnseenOrderUpdates}>
-            {ordersTagNumber}
-          </Tag>
-        )
-      ),
+      slotRight:
+        areOrdersLoading || isWaitingForOrderToIndex ? (
+          <LoadingSpinner tw="[--spinner-width:1rem]" />
+        ) : (
+          ordersTagNumber && (
+            <Tag type={TagType.Number} isHighlighted={hasUnseenOrderUpdates}>
+              {ordersTagNumber}
+            </Tag>
+          )
+        ),
 
       content: (
         <OrdersTable
           currentMarket={showCurrentMarket ? currentMarketId : undefined}
           marketTypeFilter={viewIsolated}
+          tableType="OPEN"
           columnKeys={
             isTablet
               ? [OrdersTableColumnKey.StatusFill, OrdersTableColumnKey.PriceType]
@@ -204,7 +207,9 @@ export const HorizontalPanel = ({ isOpen = true, setIsOpen }: ElementProps) => {
                   !showCurrentMarket && OrdersTableColumnKey.Market,
                   OrdersTableColumnKey.Status,
                   OrdersTableColumnKey.Side,
-                  OrdersTableColumnKey.AmountFill,
+                  OrdersTableColumnKey.Amount,
+                  OrdersTableColumnKey.Filled,
+                  OrdersTableColumnKey.OrderValue,
                   OrdersTableColumnKey.Price,
                   OrdersTableColumnKey.Trigger,
                   OrdersTableColumnKey.MarginType,
@@ -218,14 +223,69 @@ export const HorizontalPanel = ({ isOpen = true, setIsOpen }: ElementProps) => {
     }),
     [
       stringGetter,
-      currentMarketId,
-      viewIsolated,
-      showCurrentMarket,
-      isTablet,
+      areOrdersLoading,
       isWaitingForOrderToIndex,
-      isAccountViewOnly,
       ordersTagNumber,
       hasUnseenOrderUpdates,
+      showCurrentMarket,
+      currentMarketId,
+      viewIsolated,
+      isTablet,
+      isAccountViewOnly,
+    ]
+  );
+
+  const orderHistoryTabItem = useMemo(
+    () => ({
+      asChild: true,
+      value: InfoSection.OrderHistory,
+      label: stringGetter({ key: STRING_KEYS.ORDER_HISTORY_HEADER }),
+
+      slotRight: areOrdersLoading ? (
+        <LoadingSpinner tw="[--spinner-width:1rem]" />
+      ) : (
+        orderHistoryTagNumber &&
+        numUnseenOrderHistory > 0 && (
+          <Tag type={TagType.Number} isHighlighted={numUnseenOrderHistory > 0}>
+            {orderHistoryTagNumber}
+          </Tag>
+        )
+      ),
+
+      content: (
+        <OrdersTable
+          currentMarket={showCurrentMarket ? currentMarketId : undefined}
+          marketTypeFilter={viewIsolated}
+          tableType="HISTORY"
+          columnKeys={
+            isTablet
+              ? [OrdersTableColumnKey.StatusFill, OrdersTableColumnKey.PriceType]
+              : [
+                  !showCurrentMarket && OrdersTableColumnKey.Market,
+                  OrdersTableColumnKey.Status,
+                  OrdersTableColumnKey.Side,
+                  OrdersTableColumnKey.Amount,
+                  OrdersTableColumnKey.Filled,
+                  OrdersTableColumnKey.OrderValue,
+                  OrdersTableColumnKey.Price,
+                  OrdersTableColumnKey.Trigger,
+                  OrdersTableColumnKey.MarginType,
+                  OrdersTableColumnKey.Updated,
+                ].filter(isTruthy)
+          }
+          initialPageSize={initialPageSize}
+        />
+      ),
+    }),
+    [
+      stringGetter,
+      areOrdersLoading,
+      orderHistoryTagNumber,
+      numUnseenOrderHistory,
+      showCurrentMarket,
+      currentMarketId,
+      viewIsolated,
+      isTablet,
     ]
   );
 
@@ -235,10 +295,14 @@ export const HorizontalPanel = ({ isOpen = true, setIsOpen }: ElementProps) => {
       value: InfoSection.Fills,
       label: stringGetter({ key: STRING_KEYS.FILLS }),
 
-      slotRight: fillsTagNumber && (
-        <Tag type={TagType.Number} isHighlighted={hasUnseenFillUpdates}>
-          {fillsTagNumber}
-        </Tag>
+      slotRight: areFillsLoading ? (
+        <LoadingSpinner tw="[--spinner-width:1rem]" />
+      ) : (
+        fillsTagNumber && (
+          <Tag type={TagType.Number} isHighlighted={hasUnseenFillUpdates}>
+            {fillsTagNumber}
+          </Tag>
+        )
       ),
 
       content: (
@@ -258,7 +322,8 @@ export const HorizontalPanel = ({ isOpen = true, setIsOpen }: ElementProps) => {
                   FillsTableColumnKey.Side,
                   FillsTableColumnKey.AmountTag,
                   FillsTableColumnKey.Price,
-                  FillsTableColumnKey.TotalFee,
+                  FillsTableColumnKey.Total,
+                  FillsTableColumnKey.Fee,
                   FillsTableColumnKey.Liquidity,
                 ].filter(isTruthy)
           }
@@ -271,33 +336,18 @@ export const HorizontalPanel = ({ isOpen = true, setIsOpen }: ElementProps) => {
     }),
     [
       stringGetter,
-      currentMarketId,
-      showCurrentMarket,
-      isTablet,
+      areFillsLoading,
       fillsTagNumber,
       hasUnseenFillUpdates,
+      showCurrentMarket,
+      currentMarketId,
+      isTablet,
     ]
   );
 
-  // TODO - TRCL-1693 - re-enable when funding payments are supported
-  // const paymentsTabItem = {
-  //   value: InfoSection.Payments,
-  //   label: stringGetter({ key: STRING_KEYS.PAYMENTS }),
-
-  //   tag: shortenNumberForDisplay(
-  //     showCurrentMarket ? numFundingPayments : numTotalFundingPayments
-  //   ),
-  //   content: (
-  //     <FundingPaymentsTable currentMarket={showCurrentMarket ? currentMarket?.id : undefined} />
-  //   ),
-  // },
-
   const tabItems = useMemo(
-    () =>
-      uiRefresh
-        ? [positionTabItem, fillsTabItem, ordersTabItem]
-        : [positionTabItem, ordersTabItem, fillsTabItem],
-    [uiRefresh, positionTabItem, fillsTabItem, ordersTabItem]
+    () => [positionTabItem, ordersTabItem, fillsTabItem, orderHistoryTabItem],
+    [positionTabItem, fillsTabItem, ordersTabItem, orderHistoryTabItem]
   );
 
   const slotBottom = {
@@ -305,6 +355,7 @@ export const HorizontalPanel = ({ isOpen = true, setIsOpen }: ElementProps) => {
       <MaybeUnopenedIsolatedPositionsDrawer onViewOrders={onViewOrders} tw="mt-auto" />
     ),
     [InfoSection.Orders]: null,
+    [InfoSection.OrderHistory]: null,
     [InfoSection.Fills]: null,
     [InfoSection.Payments]: null,
   }[tab];
@@ -313,64 +364,24 @@ export const HorizontalPanel = ({ isOpen = true, setIsOpen }: ElementProps) => {
     <MobileTabs defaultValue={InfoSection.Position} items={tabItems} />
   ) : (
     <>
+      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+      <$DragHandle onMouseDown={handleStartResize} />
+
       <$CollapsibleTabs
         defaultTab={InfoSection.Position}
         tab={tab}
         setTab={setTab}
         defaultOpen={isOpen}
         onOpenChange={setIsOpen}
-        dividerStyle={uiRefresh ? 'underline' : 'border'}
+        dividerStyle="underline"
         slotToolbar={
-          <>
-            <ToggleGroup
-              items={[
-                {
-                  value: PanelView.AllMarkets,
-                  label: stringGetter({ key: STRING_KEYS.ALL }),
-                },
-                {
-                  value: PanelView.CurrentMarket,
-                  ...(currentMarketAssetId
-                    ? {
-                        slotBefore: <AssetIcon symbol={currentMarketAssetId} tw="text-[1.5em]" />,
-                        label: currentMarketAssetId,
-                      }
-                    : { label: stringGetter({ key: STRING_KEYS.MARKET }) }),
-                },
-              ]}
-              value={view}
-              onValueChange={setView}
-              onInteraction={() => {
-                setIsOpen?.(true);
-              }}
-            />
-            <$VerticalSeparator />
-            <$SelectMenu
-              value={viewIsolated}
-              onValueChange={(newViewIsolated: string) => {
-                setViewIsolated(newViewIsolated as MarketTypeFilter);
-              }}
-            >
-              <$SelectItem
-                key={MarketTypeFilter.AllMarkets}
-                value={MarketTypeFilter.AllMarkets}
-                label={`${stringGetter({ key: STRING_KEYS.CROSS })} / ${stringGetter({
-                  key: STRING_KEYS.ISOLATED,
-                })}`}
-              />
-              <$SelectItem
-                key={MarketTypeFilter.Isolated}
-                value={MarketTypeFilter.Isolated}
-                label={stringGetter({ key: STRING_KEYS.ISOLATED })}
-              />
-              <$SelectItem
-                key={MarketTypeFilter.Cross}
-                value={MarketTypeFilter.Cross}
-                label={stringGetter({ key: STRING_KEYS.CROSS })}
-              />
-            </$SelectMenu>
-            <$VerticalSeparator />
-          </>
+          <TradeTableSettings
+            panelView={view}
+            marketTypeFilter={viewIsolated}
+            setPanelView={setView}
+            setMarketTypeFilter={setViewIsolated}
+            onOpenChange={setIsOpen}
+          />
         }
         tabItems={tabItems}
       />
@@ -379,27 +390,20 @@ export const HorizontalPanel = ({ isOpen = true, setIsOpen }: ElementProps) => {
   );
 };
 
-const $VerticalSeparator = styled(VerticalSeparator)`
-  && {
-    height: 1em;
-  }
+const $DragHandle = styled.div`
+  width: 100%;
+  height: 0.5rem;
+  cursor: ns-resize;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
 `;
-const collapsibleTabsType = getSimpleStyledOutputType(CollapsibleTabs);
 
 const $CollapsibleTabs = styled(CollapsibleTabs)`
-  --tableHeader-backgroundColor: var(--color-layer-3);
-
   header {
     background-color: var(--color-layer-2);
   }
-` as typeof collapsibleTabsType;
-const $SelectMenu = styled(SelectMenu)`
-  ${formMixins.inputInnerSelectMenu}
-  --trigger-height: 1.75rem;
-  --trigger-radius: 2rem;
-  --trigger-backgroundColor: var(--color-layer-1);
-`;
 
-const $SelectItem = styled(SelectItem)`
-  ${formMixins.inputInnerSelectMenuItem}
-` as typeof SelectItem;
+  --trigger-active-underline-backgroundColor: var(--color-layer-2);
+` as typeof CollapsibleTabs;

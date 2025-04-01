@@ -1,14 +1,14 @@
+import BigNumber from 'bignumber.js';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 
-import { AbacusPositionSides, Nullable, SubaccountOrder } from '@/constants/abacus';
-import { ButtonShape } from '@/constants/buttons';
-import { ComplianceStates } from '@/constants/compliance';
+import { Nullable } from '@/constants/abacus';
+import { ButtonShape, ButtonStyle } from '@/constants/buttons';
 import { DialogTypes, TradeBoxDialogTypes } from '@/constants/dialogs';
 import { STRING_KEYS } from '@/constants/localization';
 import { AppRoute } from '@/constants/routes';
+import { IndexerPositionSide } from '@/types/indexer/indexerApiGen';
 
-import { useComplianceState } from '@/hooks/useComplianceState';
 import { useStringGetter } from '@/hooks/useStringGetter';
 
 import { IconName } from '@/components/Icon';
@@ -17,26 +17,23 @@ import { ActionsTableCell } from '@/components/Table/ActionsTableCell';
 import { WithTooltip } from '@/components/WithTooltip';
 
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
+import { getCurrentMarketId } from '@/state/currentMarketSelectors';
 import { closeDialogInTradeBox, openDialog, openDialogInTradeBox } from '@/state/dialogs';
 import { getActiveTradeBoxDialog } from '@/state/dialogsSelectors';
-import { getCurrentMarketId } from '@/state/perpetualsSelectors';
 
 import abacusStateManager from '@/lib/abacus';
 
 type ElementProps = {
   marketId: string;
   assetId: string;
-  leverage: Nullable<number>;
-  oraclePrice: Nullable<number>;
-  entryPrice: Nullable<number>;
-  unrealizedPnl: Nullable<number>;
-  side: Nullable<AbacusPositionSides>;
+  leverage: Nullable<BigNumber>;
+  oraclePrice: Nullable<BigNumber>;
+  entryPrice: Nullable<BigNumber>;
+  unrealizedPnl: Nullable<BigNumber>;
+  side: Nullable<IndexerPositionSide>;
   sideLabel: Nullable<string>;
-  stopLossOrders: SubaccountOrder[];
-  takeProfitOrders: SubaccountOrder[];
   isDisabled?: boolean;
   showClosePositionAction: boolean;
-  navigateToMarketOrders: (market: string) => void;
 };
 
 export const PositionsActionsCell = ({
@@ -48,11 +45,8 @@ export const PositionsActionsCell = ({
   unrealizedPnl,
   side,
   sideLabel,
-  stopLossOrders,
-  takeProfitOrders,
   isDisabled,
   showClosePositionAction,
-  navigateToMarketOrders,
 }: ElementProps) => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
@@ -60,7 +54,6 @@ export const PositionsActionsCell = ({
   const currentMarketId = useAppSelector(getCurrentMarketId);
   const activeTradeBoxDialog = useAppSelector(getActiveTradeBoxDialog);
   const stringGetter = useStringGetter();
-  const { complianceState } = useComplianceState();
 
   const onCloseButtonToggle = (isPressed: boolean) => {
     navigate(`${AppRoute.Trade}/${marketId}`);
@@ -75,33 +68,16 @@ export const PositionsActionsCell = ({
     }
   };
 
-  const openTriggersDialog = () => {
-    if (isDisabled) {
-      return;
-    }
-    dispatch(
-      openDialog(
-        DialogTypes.Triggers({
-          marketId,
-          assetId,
-          stopLossOrders,
-          takeProfitOrders,
-          navigateToMarketOrders,
-        })
-      )
-    );
-  };
-
   const openShareDialog = () => {
     dispatch(
       openDialog(
         DialogTypes.SharePNLAnalytics({
           marketId,
           assetId,
-          leverage,
-          oraclePrice,
-          entryPrice,
-          unrealizedPnl,
+          leverage: leverage?.toNumber(),
+          oraclePrice: oraclePrice?.toNumber(),
+          entryPrice: entryPrice?.toNumber(),
+          unrealizedPnl: unrealizedPnl?.toNumber(),
           side,
           sideLabel,
         })
@@ -110,27 +86,17 @@ export const PositionsActionsCell = ({
   };
 
   return (
-    <ActionsTableCell>
-      {!isDisabled && complianceState === ComplianceStates.FULL_ACCESS && (
-        <WithTooltip
-          tooltipString={stringGetter({ key: STRING_KEYS.EDIT_TAKE_PROFIT_STOP_LOSS_TRIGGERS })}
-        >
-          <$TriggersButton
-            key="edittriggers"
-            onClick={openTriggersDialog}
-            iconName={IconName.Pencil}
-            shape={ButtonShape.Square}
-            disabled={isDisabled}
-          />
-        </WithTooltip>
-      )}
-      <$TriggersButton
-        key="share"
-        onClick={openShareDialog}
-        iconName={IconName.Share}
-        shape={ButtonShape.Square}
-        disabled={isDisabled}
-      />
+    <$ActionsTableCell tw="mr-[-0.5rem]">
+      <WithTooltip tooltipString={stringGetter({ key: STRING_KEYS.SHARE })}>
+        <$TriggersButton
+          key="share"
+          onClick={openShareDialog}
+          iconName={IconName.Share}
+          shape={ButtonShape.Square}
+          disabled={isDisabled}
+          buttonStyle={ButtonStyle.WithoutBackground}
+        />
+      </WithTooltip>
       {showClosePositionAction && (
         <WithTooltip tooltipString={stringGetter({ key: STRING_KEYS.CLOSE_POSITION })}>
           <$CloseButtonToggle
@@ -145,17 +111,24 @@ export const PositionsActionsCell = ({
             iconName={IconName.Close}
             shape={ButtonShape.Square}
             disabled={isDisabled}
+            buttonStyle={ButtonStyle.WithoutBackground}
           />
         </WithTooltip>
       )}
-    </ActionsTableCell>
+    </$ActionsTableCell>
   );
 };
 
+const $ActionsTableCell = styled(ActionsTableCell)`
+  --toolbar-margin: 0.25rem;
+`;
+
 const $TriggersButton = styled(IconButton)`
-  --button-icon-size: 1.5em;
+  --button-icon-size: 1.25em;
   --button-textColor: var(--color-text-0);
   --button-hover-textColor: var(--color-text-1);
+
+  --button-icon-size: 1em;
 `;
 
 const $CloseButtonToggle = styled(IconButton)`

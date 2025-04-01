@@ -1,11 +1,18 @@
-import { Link, useNavigate } from 'react-router-dom';
-import styled, { css } from 'styled-components';
+import { shallowEqual } from 'react-redux';
+import { Link } from 'react-router-dom';
+import styled from 'styled-components';
 
+import { OnboardingState } from '@/constants/account';
 import { ButtonAction, ButtonShape, ButtonSize } from '@/constants/buttons';
+import { ComplianceStates } from '@/constants/compliance';
 import { DialogTypes } from '@/constants/dialogs';
 import { STRING_KEYS } from '@/constants/localization';
 import { AppRoute } from '@/constants/routes';
+import { StatsigFlags } from '@/constants/statsig';
 
+import { useAccounts } from '@/hooks/useAccounts';
+import { useComplianceState } from '@/hooks/useComplianceState';
+import { useStatsigGateValue } from '@/hooks/useStatsig';
 import { useStringGetter } from '@/hooks/useStringGetter';
 import { useTokenConfigs } from '@/hooks/useTokenConfigs';
 import { useURLConfigs } from '@/hooks/useURLConfigs';
@@ -28,8 +35,9 @@ import { LanguageSelector } from '@/views/menus/LanguageSelector';
 import { NetworkSelectMenu } from '@/views/menus/NetworkSelectMenu';
 import { NotificationsMenu } from '@/views/menus/NotificationsMenu';
 
+import { getOnboardingState, getSubaccount } from '@/state/accountSelectors';
 import { useAppDispatch, useAppSelector } from '@/state/appTypes';
-import { getHasSeenLaunchIncentives } from '@/state/configsSelectors';
+import { getHasSeenLaunchIncentives } from '@/state/appUiConfigsSelectors';
 import { openDialog } from '@/state/dialogs';
 
 import { isTruthy } from '@/lib/isTruthy';
@@ -39,13 +47,17 @@ export const HeaderDesktop = () => {
   const stringGetter = useStringGetter();
   const { documentation, community, mintscanBase, exchangeStats } = useURLConfigs();
   const dispatch = useAppDispatch();
-  const navigate = useNavigate();
   const { chainTokenLabel } = useTokenConfigs();
-  const {
-    enableVaults: showVaults,
-    pml: showLaunchMarkets,
-    uiRefresh: uiRefreshEnabled,
-  } = testFlags;
+  const { dydxAccounts } = useAccounts();
+  const onboardingState = useAppSelector(getOnboardingState);
+  const { complianceState } = useComplianceState();
+
+  const subAccount = useAppSelector(getSubaccount, shallowEqual);
+  const { freeCollateral: availableBalance } = subAccount ?? {};
+
+  const affiliatesEnabled = useStatsigGateValue(StatsigFlags.ffEnableAffiliates);
+  const showNewDepositFlow =
+    useStatsigGateValue(StatsigFlags.ffDepositRewrite) || testFlags.showNewDepositFlow;
 
   const hasSeenLaunchIncentives = useAppSelector(getHasSeenLaunchIncentives);
 
@@ -58,47 +70,17 @@ export const HeaderDesktop = () => {
           label: stringGetter({ key: STRING_KEYS.TRADE }),
           href: AppRoute.Trade,
         },
-        ...(uiRefreshEnabled
-          ? [
-              {
-                value: 'MARKETS',
-                label: stringGetter({ key: STRING_KEYS.MARKETS }),
-                href: AppRoute.Markets,
-              },
-              {
-                value: 'PORTFOLIO',
-                label: stringGetter({ key: STRING_KEYS.PORTFOLIO }),
-                href: AppRoute.Portfolio,
-              },
-            ]
-          : [
-              {
-                value: 'PORTFOLIO',
-                label: stringGetter({ key: STRING_KEYS.PORTFOLIO }),
-                href: AppRoute.Portfolio,
-              },
-              {
-                value: 'MARKETS',
-                label: stringGetter({ key: STRING_KEYS.MARKETS }),
-                href: AppRoute.Markets,
-              },
-            ]),
-        ...(showLaunchMarkets
-          ? [
-              {
-                value: 'LAUNCH_MARKET',
-                label: stringGetter({ key: STRING_KEYS.LAUNCH_MARKETS }),
-                href: AppRoute.LaunchMarket,
-              },
-              // TODO (@jaredvu): Remove this after adding updated markets-table
-              {
-                value: 'TEST_MARKET',
-                label: 'TIME-USD',
-                href: '/trade/TIME,RAYDIUM,ED5WBEYAYTLM4WRGNOHPXJEWNIAIKEFIOVMJYZH6K31M-USD?pml=true',
-              },
-            ]
-          : []),
-        showVaults && {
+        {
+          value: 'MARKETS',
+          label: stringGetter({ key: STRING_KEYS.MARKETS }),
+          href: AppRoute.Markets,
+        },
+        {
+          value: 'PORTFOLIO',
+          label: stringGetter({ key: STRING_KEYS.PORTFOLIO }),
+          href: AppRoute.Portfolio,
+        },
+        {
           value: 'VAULT',
           label: (
             <>
@@ -106,6 +88,11 @@ export const HeaderDesktop = () => {
             </>
           ),
           href: AppRoute.Vault,
+        },
+        affiliatesEnabled && {
+          value: 'REFERRALS',
+          label: stringGetter({ key: STRING_KEYS.REFERRALS }),
+          href: AppRoute.Referrals,
         },
         {
           value: chainTokenLabel,
@@ -178,15 +165,17 @@ export const HeaderDesktop = () => {
   ];
 
   return (
-    <$Header uiRefreshEnabled={uiRefreshEnabled}>
+    <$Header>
       <$LogoLink to="/">
         <LogoShortIcon />
       </$LogoLink>
 
       <VerticalSeparator />
 
-      <$NavBefore uiRefreshEnabled={uiRefreshEnabled}>
-        <LanguageSelector sideOffset={16} />
+      <$NavBefore>
+        <$LanguageSelector sideOffset={16}>
+          <Icon iconName={IconName.Translate} size="1.25em" />
+        </$LanguageSelector>
         <VerticalSeparator />
         <NetworkSelectMenu sideOffset={16} />
       </$NavBefore>
@@ -194,36 +183,38 @@ export const HeaderDesktop = () => {
       <VerticalSeparator />
 
       <$NavigationScrollBar>
-        <$NavigationMenu items={navItems} orientation="horizontal" />
+        <$NavigationMenu items={navItems} orientation="horizontal" dividerStyle="underline" />
       </$NavigationScrollBar>
 
       <div role="separator" />
 
       <$NavAfter>
-        {uiRefreshEnabled && (
-          <>
-            {showLaunchMarkets && (
-              <$LaunchMarketButton
+        {onboardingState === OnboardingState.AccountConnected &&
+          complianceState === ComplianceStates.FULL_ACCESS && (
+            <>
+              <Button
+                tw="mr-[0.5em]"
                 shape={ButtonShape.Pill}
                 size={ButtonSize.XSmall}
-                action={ButtonAction.Navigation}
-                onClick={() => navigate(AppRoute.LaunchMarket)}
+                action={
+                  !availableBalance || availableBalance.gt(0)
+                    ? ButtonAction.Secondary
+                    : ButtonAction.Primary
+                }
+                onClick={() => {
+                  dispatch(
+                    openDialog(
+                      showNewDepositFlow ? DialogTypes.Deposit2({}) : DialogTypes.Deposit({})
+                    )
+                  );
+                }}
+                state={{ isDisabled: !dydxAccounts }}
               >
-                {stringGetter({ key: STRING_KEYS.LAUNCH_MARKET_WITH_PLUS })}
-              </$LaunchMarketButton>
-            )}
-            <Button
-              tw="mr-[0.5em]"
-              shape={ButtonShape.Pill}
-              size={ButtonSize.XSmall}
-              action={ButtonAction.Primary}
-              onClick={() => dispatch(openDialog(DialogTypes.Deposit()))}
-            >
-              {stringGetter({ key: STRING_KEYS.DEPOSIT })}
-            </Button>
-            <VerticalSeparator />
-          </>
-        )}
+                {stringGetter({ key: STRING_KEYS.DEPOSIT })}
+              </Button>
+              <VerticalSeparator />
+            </>
+          )}
 
         <MobileDownloadLinks />
 
@@ -251,9 +242,7 @@ export const HeaderDesktop = () => {
     </$Header>
   );
 };
-const $Header = styled.header<{
-  uiRefreshEnabled: boolean;
-}>`
+const $Header = styled.header`
   --header-horizontal-padding-mobile: 0.5rem;
   --trigger-height: 2.25rem;
   --logo-width: 3.5rem;
@@ -262,7 +251,7 @@ const $Header = styled.header<{
   ${layoutMixins.stickyHeader}
   ${layoutMixins.scrollSnapItem}
   backdrop-filter: none;
-
+  background-color: var(--color-layer-2);
   height: var(--page-currentHeaderHeight);
 
   grid-area: Header;
@@ -270,17 +259,10 @@ const $Header = styled.header<{
   display: grid;
   align-items: stretch;
   grid-auto-flow: column;
-  grid-template: ${({ uiRefreshEnabled }) => css`
-    ${uiRefreshEnabled
-      ? css`'Logo . NavBefore . Nav . NavAfter' 100%
-      / var(--logo-width) var(--border-width) auto
-      var(--border-width) 1fr var(--border-width) auto`
-      : css`'Logo . NavBefore . Nav . NavAfter' 100%
-    / var(--logo-width) var(--border-width) calc(
-      var(--sidebar-width) - var(--logo-width) - var(--border-width)
-    )
-    var(--border-width) 1fr var(--border-width) auto`}
-  `};
+  grid-template:
+    'Logo . NavBefore . Nav . NavAfter' 100%
+    / var(--logo-width) var(--border-width) auto
+    var(--border-width) 1fr var(--border-width) auto;
 
   z-index: 2;
 
@@ -293,12 +275,6 @@ const $Header = styled.header<{
   }
 
   font-size: 0.9375rem;
-
-  &:before {
-    --backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: var(--backdrop-filter);
-    backdrop-filter: var(--backdrop-filter);
-  }
 `;
 
 const $NavigationScrollBar = styled.div`
@@ -308,30 +284,16 @@ const $NavigationScrollBar = styled.div`
 const $NavigationMenu = styled(NavigationMenu)`
   & {
     --navigationMenu-height: var(--stickyArea-topHeight);
-    --navigationMenu-item-height: var(--trigger-height);
+    --navigationMenu-item-height: var(--stickyArea-topHeight);
   }
 
   ${layoutMixins.scrollArea}
-  padding: 0 0.5rem;
+  padding: 0 1rem;
   scroll-padding: 0 0.5rem;
 ` as typeof NavigationMenu;
 
-const $NavBefore = styled.div<{
-  uiRefreshEnabled: boolean;
-}>`
-  ${({ uiRefreshEnabled }) => css`
-    ${uiRefreshEnabled
-      ? css`
-          ${layoutMixins.row}
-        `
-      : css`
-          direction: rtl;
-          > * {
-            direction: initial;
-          }
-          ${layoutMixins.flexEqualColumns}
-        `}
-  `}
+const $NavBefore = styled.div`
+  ${layoutMixins.row}
 
   > * {
     align-self: center;
@@ -370,7 +332,7 @@ const $IconButton = styled(IconButton)<{ size?: string }>`
   --button-padding: 0 0.5em;
 `;
 
-const $LaunchMarketButton = styled(Button)`
-  --button-backgroundColor: var(--color-layer-5);
-  --button-border: solid var(--border-width) var(--color-border);
+const $LanguageSelector = styled(LanguageSelector)`
+  ${headerMixins.dropdownTrigger}
+  --trigger-padding: 0.33rem 0.5rem;
 `;

@@ -23,9 +23,7 @@ import { AlertMessage } from '@/components/AlertMessage';
 import { Button } from '@/components/Button';
 import { GreenCheckCircle } from '@/components/GreenCheckCircle';
 import { LoadingSpinner } from '@/components/Loading/LoadingSpinner';
-import { Switch } from '@/components/Switch';
 import { WithReceipt } from '@/components/WithReceipt';
-import { WithTooltip } from '@/components/WithTooltip';
 
 import { useAppDispatch } from '@/state/appTypes';
 import { setSavedEncryptedSignature } from '@/state/wallet';
@@ -44,7 +42,6 @@ type ElementProps = {
 export const GenerateKeys = ({ status, setStatus, onKeysDerived = () => {} }: ElementProps) => {
   const stringGetter = useStringGetter();
   const dispatch = useAppDispatch();
-  const [shouldRememberMe, setShouldRememberMe] = useState(false);
 
   const { sourceAccount, setWalletFromSignature } = useAccounts();
 
@@ -62,7 +59,7 @@ export const GenerateKeys = ({ status, setStatus, onKeysDerived = () => {} }: El
     setError(undefined);
 
     try {
-      await matchNetwork?.();
+      await matchNetwork();
       return true;
     } catch (err) {
       const { message, walletErrorType, isErrorExpected } = parseWalletError({
@@ -157,7 +154,7 @@ export const GenerateKeys = ({ status, setStatus, onKeysDerived = () => {} }: El
       await setWalletFromSignature(signature);
 
       // 3: Remember me (encrypt and store signature)
-      if (shouldRememberMe && staticEncryptionKey) {
+      if (staticEncryptionKey) {
         const encryptedSignature = AES.encrypt(signature, staticEncryptionKey).toString();
         dispatch(setSavedEncryptedSignature(encryptedSignature));
       }
@@ -212,6 +209,10 @@ export const GenerateKeys = ({ status, setStatus, onKeysDerived = () => {} }: El
           .filter(isTruthy)
           .map((step) => (
             <$StatusCard key={step.status} active={status === step.status}>
+              <div>
+                <h3>{step.title}</h3>
+                <p>{step.description}</p>
+              </div>
               {status < step.status ? (
                 <LoadingSpinner disabled />
               ) : status === step.status ? (
@@ -219,31 +220,15 @@ export const GenerateKeys = ({ status, setStatus, onKeysDerived = () => {} }: El
               ) : (
                 <GreenCheckCircle tw="[--icon-size:2.375rem]" />
               )}
-              <div>
-                <h3>{step.title}</h3>
-                <p>{step.description}</p>
-              </div>
             </$StatusCard>
           ))}
       </div>
 
       <$Footer>
-        <label htmlFor="remember-me" tw="spacedRow font-base-book">
-          <WithTooltip withIcon tooltip="remember-me">
-            {stringGetter({ key: STRING_KEYS.REMEMBER_ME })}
-          </WithTooltip>
-
-          <Switch
-            name="remember-me"
-            disabled={!staticEncryptionKey || isDeriving}
-            checked={shouldRememberMe}
-            onCheckedChange={setShouldRememberMe}
-          />
-        </label>
         {error && <AlertMessage type={AlertType.Error}>{error}</AlertMessage>}
         <WithReceipt
           slotReceipt={
-            <div tw="p-1 text-color-text-0 font-small-book">
+            <div tw="p-1 text-center text-color-text-0 font-small-medium">
               <span>
                 {stringGetter({
                   key: STRING_KEYS.FREE_SIGNING,
@@ -270,41 +255,45 @@ export const GenerateKeys = ({ status, setStatus, onKeysDerived = () => {} }: El
             </Button>
           ) : (
             <Button
+              tw="font-small-bold"
               action={ButtonAction.Primary}
               onClick={onClickSendRequestOrTryAgain}
+              withContentOnLoading
               state={{
                 isLoading: isDeriving,
                 isDisabled: status !== EvmDerivedAccountStatus.NotDerived,
               }}
             >
-              {!error
+              {isDeriving
                 ? stringGetter({
-                    key: STRING_KEYS.SEND_REQUEST,
+                    key: STRING_KEYS.CHECK_WALLET_FOR_REQUEST,
                   })
-                : stringGetter({
-                    key: STRING_KEYS.TRY_AGAIN,
-                  })}
+                : !error
+                  ? stringGetter({
+                      key: STRING_KEYS.SEND_REQUEST,
+                    })
+                  : stringGetter({
+                      key: STRING_KEYS.TRY_AGAIN,
+                    })}
             </Button>
           )}
         </WithReceipt>
-        <span tw="text-center text-color-text-0 font-base-book">
-          {stringGetter({ key: STRING_KEYS.CHECK_WALLET_FOR_REQUEST })}
-        </span>
       </$Footer>
     </>
   );
 };
 const $StatusCard = styled.div<{ active?: boolean }>`
-  ${layoutMixins.row}
+  ${layoutMixins.spacedRow}
   gap: 1rem;
   background-color: var(--color-layer-4);
   padding: 1rem;
+  border: var(--border);
   border-radius: 0.625rem;
 
   ${({ active }) =>
     active &&
     css`
-      background-color: var(--color-layer-6);
+      background-color: var(--color-layer-5);
     `}
   > div {
     ${layoutMixins.column}
@@ -316,8 +305,8 @@ const $StatusCard = styled.div<{ active?: boolean }>`
     }
 
     p {
-      color: var(--color-text-1);
-      font: var(--font-small-regular);
+      color: var(--color-text-0);
+      font: var(--font-small-medium);
     }
   }
 `;

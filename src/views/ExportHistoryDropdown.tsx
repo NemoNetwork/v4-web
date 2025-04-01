@@ -20,15 +20,14 @@ import { DropdownMenu } from '@/components/DropdownMenu';
 import { Icon, IconName } from '@/components/Icon';
 import { OutputType, formatNumberOutput } from '@/components/Output';
 
-import { getIsAccountConnected, getSubaccountId } from '@/state/accountSelectors';
+import { getSubaccountId } from '@/state/accountInfoSelectors';
+import { getIsAccountConnected } from '@/state/accountSelectors';
 import { useAppSelector } from '@/state/appTypes';
 import { getSelectedLocale } from '@/state/localizationSelectors';
 
 import { track } from '@/lib/analytics/analytics';
 import { exportCSV } from '@/lib/csv';
-import { isTruthy } from '@/lib/isTruthy';
 import { MustBigNumber } from '@/lib/numbers';
-import { testFlags } from '@/lib/testFlags';
 
 interface ExportHistoryDropdownProps {
   className?: string;
@@ -82,10 +81,7 @@ export const ExportHistoryDropdown = (props: ExportHistoryDropdownProps) => {
         return {
           type: fill.type,
           liquidity: fill.liquidity,
-          time: new Date(fill.createdAt).toLocaleString(selectedLocale, {
-            dateStyle: 'short',
-            timeStyle: 'short',
-          }),
+          time: new Date(fill.createdAt).toISOString(),
           amount: fill.size,
           price,
           fee,
@@ -233,7 +229,7 @@ export const ExportHistoryDropdown = (props: ExportHistoryDropdownProps) => {
                   dateStyle: 'short',
                   timeStyle: 'short',
                 }),
-          action: transfer.type?.name ?? '',
+          action: transfer.type ?? '',
           amount,
           id: transfer.id,
         };
@@ -355,7 +351,7 @@ export const ExportHistoryDropdown = (props: ExportHistoryDropdownProps) => {
           value: 'transfers',
           onSelect: (e: Event) => e.preventDefault(),
         },
-        testFlags.enableVaults && {
+        {
           label: (
             <Checkbox
               label={stringGetter({ key: STRING_KEYS.VAULT_TRANSFERS })}
@@ -399,7 +395,7 @@ export const ExportHistoryDropdown = (props: ExportHistoryDropdownProps) => {
           value: 'download',
           onSelect: exportData,
         },
-      ].filter(isTruthy)}
+      ]}
       triggerOptions={{
         disabled: !isAccountConnected,
       }}

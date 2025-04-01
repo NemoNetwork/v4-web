@@ -1,11 +1,14 @@
 import { ReactNode } from 'react';
 
+import { PositionUniqueId, SubaccountPosition } from '@/bonsai/types/summaryTypes';
 import { TagsOf, UnionOf, ofType, unionize } from 'unionize';
+
+import { IndexerPositionSide } from '@/types/indexer/indexerApiGen';
 
 import { BigNumberish } from '@/lib/numbers';
 
-import { AbacusPositionSides, Nullable, SubaccountOrder, SubaccountPosition } from './abacus';
-import { NewMarketProposal } from './potentialMarkets';
+import { Nullable } from './abacus';
+import { IAffiliateStats } from './affiliates';
 import { DydxChainAsset } from './wallets';
 
 type SharedDialogProps = { setIsOpen: (open: boolean) => void };
@@ -13,7 +16,7 @@ export type DialogProps<T> = T & SharedDialogProps;
 
 export type AcknowledgeTermsDialogProps = {};
 export type AdjustIsolatedMarginDialogProps = {
-  positionId: SubaccountPosition['id'];
+  positionId: SubaccountPosition['uniqueId'];
 };
 export type AdjustTargetLeverageDialogProps = {};
 export type ClosePositionDialogProps = {};
@@ -24,7 +27,9 @@ export type ComplianceConfigDialogProps = {};
 export type ConfirmPendingDepositDialogProps = {
   usdcBalance: number;
 };
-export type DepositDialogProps = {};
+export type DepositDialogProps = {
+  depositType?: 'funkit' | 'standard';
+};
 export type DisconnectWalletDialogProps = {};
 export type DisplaySettingsDialogProps = {};
 export type ExchangeOfflineDialogProps = { preventClose?: boolean };
@@ -41,18 +46,10 @@ export type GeoComplianceDialogProps = {};
 export type GlobalCommandDialogProps = {};
 export type HelpDialogProps = {};
 export type ExternalNavKeplrDialogProps = {};
-export type LaunchMarketDialogProps = { defaultLaunchableMarketId?: string };
 export type ManageFundsDialogProps = { selectedTransferType?: string };
 export type MnemonicExportDialogProps = {};
 export type MobileDownloadDialogProps = { mobileAppUrl: string };
 export type MobileSignInDialogProps = {};
-export type NewMarketAgreementDialogProps = { acceptTerms: () => void };
-export type NewMarketMessageDetailsDialogProps = {
-  preventClose?: boolean;
-  assetData: NewMarketProposal;
-  clobPairId?: number;
-  liquidityTier?: number;
-};
 export type OnboardingDialogProps = {};
 export type OrderDetailsDialogProps = { orderId: string };
 export type PredictionMarketIntroDialogProps = {};
@@ -70,7 +67,7 @@ export type SharePNLAnalyticsDialogProps = {
   oraclePrice: Nullable<number>;
   entryPrice: Nullable<number>;
   unrealizedPnl: Nullable<number>;
-  side: Nullable<AbacusPositionSides>;
+  side: Nullable<IndexerPositionSide>;
   sideLabel: Nullable<string>;
 };
 export type StakeDialogProps = {};
@@ -80,19 +77,29 @@ export type TradeDialogProps = {
   slotTrigger?: React.ReactNode;
 };
 export type TriggersDialogProps = {
+  positionUniqueId: PositionUniqueId;
   marketId: string;
   assetId: string;
-  stopLossOrders: SubaccountOrder[];
-  takeProfitOrders: SubaccountOrder[];
   navigateToMarketOrders: (market: string) => void;
 };
 export type TransferDialogProps = { selectedAsset?: DydxChainAsset };
 export type UnstakeDialogProps = {};
 export type VaultDepositWithdrawDialogProps = { initialType?: 'DEPOSIT' | 'WITHDRAW' };
 export type WithdrawDialogProps = {};
+export type WithdrawDialog2Props = {};
+export type DepositDialog2Props = {};
+export type TransferStatusDialogProps = { transferId: string };
 export type WithdrawalGatedDialogProps = {
   transferType: 'withdrawal' | 'transfer';
   estimatedUnblockTime?: string | null;
+};
+export type CriteriaDialogProps = {
+  accountStats?: IAffiliateStats;
+  stakedAmount?: bigint;
+  userTier?: number | 'vip';
+};
+export type CoinbaseDepositDialogProps = {
+  onBack?: () => void;
 };
 
 export const DialogTypes = unionize(
@@ -105,8 +112,12 @@ export const DialogTypes = unionize(
     CloseAllPositionsConfirmation: ofType<CloseAllPositionsConfirmationDialogProps>(),
     ClosePosition: ofType<ClosePositionDialogProps>(),
     ComplianceConfig: ofType<ComplianceConfigDialogProps>(),
+    CoinbaseDepositDialog: ofType<CoinbaseDepositDialogProps>(),
     ConfirmPendingDeposit: ofType<ConfirmPendingDepositDialogProps>(),
+    Criteria: ofType<CriteriaDialogProps>(),
     Deposit: ofType<DepositDialogProps>(),
+    /* TODO: rename Deposit2 to Deposit once old deposit flow is deprecated */
+    Deposit2: ofType<DepositDialog2Props>(),
     DisconnectWallet: ofType<DisconnectWalletDialogProps>(),
     DisplaySettings: ofType<DisplaySettingsDialogProps>(),
     ExchangeOffline: ofType<ExchangeOfflineDialogProps>(),
@@ -117,13 +128,10 @@ export const DialogTypes = unionize(
     GeoCompliance: ofType<GeoComplianceDialogProps>(),
     GlobalCommand: ofType<GlobalCommandDialogProps>(),
     Help: ofType<HelpDialogProps>(),
-    LaunchMarket: ofType<LaunchMarketDialogProps>(),
     ManageFunds: ofType<ManageFundsDialogProps>(),
     MnemonicExport: ofType<MnemonicExportDialogProps>(),
     MobileDownload: ofType<MobileDownloadDialogProps>(),
     MobileSignIn: ofType<MobileSignInDialogProps>(),
-    NewMarketAgreement: ofType<NewMarketAgreementDialogProps>(),
-    NewMarketMessageDetails: ofType<NewMarketMessageDetailsDialogProps>(),
     Onboarding: ofType<OnboardingDialogProps>(),
     OrderDetails: ofType<OrderDetailsDialogProps>(),
     PredictionMarketIntro: ofType<PredictionMarketIntroDialogProps>(),
@@ -139,10 +147,12 @@ export const DialogTypes = unionize(
     StakingReward: ofType<StakingRewardDialogProps>(),
     Trade: ofType<TradeDialogProps>(),
     Transfer: ofType<TransferDialogProps>(),
+    TransferStatus: ofType<TransferStatusDialogProps>(),
     Triggers: ofType<TriggersDialogProps>(),
     Unstake: ofType<UnstakeDialogProps>(),
     VaultDepositWithdraw: ofType<VaultDepositWithdrawDialogProps>(),
     Withdraw: ofType<WithdrawDialogProps>(),
+    Withdraw2: ofType<WithdrawDialog2Props>(),
     WithdrawalGated: ofType<WithdrawalGatedDialogProps>(),
   },
   { tag: 'type' as const, value: 'props' as const }

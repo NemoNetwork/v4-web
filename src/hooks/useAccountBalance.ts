@@ -1,10 +1,10 @@
 import { useCallback, useMemo } from 'react';
 
+import { BonsaiCore, BonsaiHooks } from '@/bonsai/ontology';
 import { StargateClient } from '@cosmjs/stargate';
 import { PublicKey } from '@solana/web3.js';
 import { QueryObserverResult, RefetchOptions, useQuery } from '@tanstack/react-query';
 import BigNumber from 'bignumber.js';
-import { shallowEqual } from 'react-redux';
 import { erc20Abi, formatUnits } from 'viem';
 import { useBalance, useReadContracts } from 'wagmi';
 
@@ -19,10 +19,10 @@ import { EvmAddress, SolAddress, WalletNetworkType } from '@/constants/wallets';
 
 import { useSolanaConnection } from '@/hooks/useSolanaConnection';
 
-import { getBalances, getStakingBalances } from '@/state/accountSelectors';
 import { getSelectedDydxChainId } from '@/state/appSelectors';
 import { useAppSelector } from '@/state/appTypes';
 
+import { isNativeDenom } from '@/lib/assetUtils';
 import { MustBigNumber } from '@/lib/numbers';
 
 import { useAccounts } from './useAccounts';
@@ -40,13 +40,6 @@ type UseAccountBalanceProps = {
   isCosmosChain?: boolean;
 };
 
-/**
- * cosmjs uses this 0x address as the chain's native token.
- * skip does not, but we add this value in order to be able to send payloads to cosmjs
- * @todo We may need to add additional logic here if we 'useAccountBalance' on forms that do not follow this format.
- */
-export const CHAIN_DEFAULT_TOKEN_ADDRESS = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
-
 export const useAccountBalance = ({
   addressOrDenom,
   chainId,
@@ -62,10 +55,13 @@ export const useAccountBalance = ({
 } => {
   const { sourceAccount, dydxAccountGraz, dydxAddress } = useAccounts();
 
-  const balances = useAppSelector(getBalances, shallowEqual);
-  const { chainTokenDenom, usdcDenom, usdcDecimals } = useTokenConfigs();
+  const { chainTokenAmount: nativeTokenCoinBalance, usdcAmount: usdcCoinBalance } = useAppSelector(
+    BonsaiCore.account.balances.data
+  );
+
+  const { chainTokenDenom, usdcDecimals } = useTokenConfigs();
   const evmChainId = Number(useEnvConfig('ethereumChainId'));
-  const stakingBalances = useAppSelector(getStakingBalances, shallowEqual);
+  const stakingBalances = BonsaiHooks.useStakingDelegations().data?.balances;
   const selectedDydxChainId = useAppSelector(getSelectedDydxChainId);
 
   const { nobleValidator, osmosisValidator, neutronValidator, validators } = useEndpointsConfig();
@@ -77,7 +73,7 @@ export const useAccountBalance = ({
       : undefined;
   const solAddress = isSolanaChain ? (sourceAccount.address as SolAddress) : undefined;
 
-  const isEVMnativeToken = addressOrDenom === CHAIN_DEFAULT_TOKEN_ADDRESS;
+  const isEVMnativeToken = isNativeDenom(addressOrDenom);
 
   const evmNative = useBalance({
     address: evmAddress,
@@ -206,7 +202,7 @@ export const useAccountBalance = ({
         const currentBalance = current.account.data.parsed.info.tokenAmount.uiAmount;
         const largestBalance = largest.account.data.parsed.info.tokenAmount.uiAmount;
         return currentBalance >= largestBalance ? current : largest;
-      }, accounts[0]);
+      }, accounts[0]!);
 
       return {
         data: {
@@ -237,7 +233,7 @@ export const useAccountBalance = ({
       ? formatUnits(evmNativeBalance, evmNativeDecimals)
       : undefined
     : evmTokenBalance?.result !== undefined && evmTokenDecimals?.result !== undefined
-      ? formatUnits(evmTokenBalance?.result, evmTokenDecimals?.result)
+      ? formatUnits(evmTokenBalance.result, evmTokenDecimals.result)
       : undefined;
 
   // remove fee from usdc cosmos balance
@@ -245,15 +241,12 @@ export const useAccountBalance = ({
     ? Math.max(parseFloat(cosmosQuery.data) - COSMOS_GAS_RESERVE, 0)
     : undefined;
 
-  const solBalance = solanaQuery?.data?.data.formatted;
+  const solBalance = solanaQuery.data?.data.formatted;
 
   const balance = isCosmosChain ? cosmosBalance : isSolanaChain ? solBalance : evmBalance;
 
-  const nativeTokenCoinBalance = balances?.[chainTokenDenom];
-  const nativeTokenBalance = MustBigNumber(nativeTokenCoinBalance?.amount);
-
-  const usdcCoinBalance = balances?.[usdcDenom];
-  const usdcBalance = MustBigNumber(usdcCoinBalance?.amount).toNumber();
+  const nativeTokenBalance = MustBigNumber(nativeTokenCoinBalance);
+  const usdcBalance = MustBigNumber(usdcCoinBalance).toNumber();
 
   const nativeStakingCoinBalanace = stakingBalances?.[chainTokenDenom];
   const nativeStakingBalance = MustBigNumber(nativeStakingCoinBalanace?.amount).toNumber();

@@ -108,7 +108,7 @@ type WalletConfig = {
   icon: string;
 };
 
-export const wallets: Record<WalletInfo['name'], WalletConfig> = {
+export const wallets = {
   [WalletType.OtherWallet]: {
     type: WalletType.OtherWallet,
     stringKey: STRING_KEYS.OTHER_WALLET,
@@ -154,7 +154,7 @@ export const wallets: Record<WalletInfo['name'], WalletConfig> = {
     stringKey: STRING_KEYS.METAMASK,
     icon: MetaMaskIcon,
   },
-};
+} satisfies Record<WalletInfo['name'], WalletConfig>;
 
 /**
  * @description typed data to sign for dYdX Chain onboarding
@@ -177,7 +177,7 @@ export type PrivateInformation = ReturnType<typeof onboarding.deriveHDKeyFromEth
 
 export type EvmAddress = `0x${string}`;
 export type SolAddress = `${string}`;
-export type DydxAddress = `dydx${string}`;
+export type DydxAddress = `nemo${string}`;
 
 // Extension wallet EIP-6963 identifiers
 export const PHANTOM_MIPD_RDNS = 'app.phantom';
@@ -186,7 +186,6 @@ export const KEPLR_MIPD_RDNS = 'app.keplr';
 export const COINBASE_MIPD_RDNS = 'com.coinbase.wallet';
 export const METAMASK_MIPD_RDNS = 'io.metamask';
 
-export const METAMASK_DOWNLOAD_LINK = 'https://metamask.io/download/';
 export const PHANTOM_DOWNLOAD_LINK = 'https://phantom.app/download';
 export const KEPLR_DOWNLOAD_LINK = 'https://www.keplr.app/get';
 

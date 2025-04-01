@@ -1,8 +1,9 @@
-import styled, { css } from 'styled-components';
+import styled from 'styled-components';
 
 import { OnboardingState } from '@/constants/account';
 import { STRING_KEYS } from '@/constants/localization';
 
+import { useBreakpoints } from '@/hooks/useBreakpoints';
 import { useStringGetter } from '@/hooks/useStringGetter';
 
 import { layoutMixins } from '@/styles/layoutMixins';
@@ -13,7 +14,7 @@ import { calculateCanViewAccount } from '@/state/accountCalculators';
 import { getOnboardingState } from '@/state/accountSelectors';
 import { useAppSelector } from '@/state/appTypes';
 
-import { AccountInfoConnectedState } from './AccountInfo/AccountInfoConnectedState';
+import { AccountInfoSection } from './AccountInfo/AccountInfoSection';
 
 type StyleProps = {
   className?: string;
@@ -21,13 +22,15 @@ type StyleProps = {
 
 export const AccountInfo: React.FC = ({ className }: StyleProps) => {
   const stringGetter = useStringGetter();
+  const { isTablet } = useBreakpoints();
+
   const onboardingState = useAppSelector(getOnboardingState);
   const canViewAccountInfo = useAppSelector(calculateCanViewAccount);
 
   return (
-    <$AccountInfoSectionContainer className={className} showAccountInfo={canViewAccountInfo}>
-      {onboardingState === OnboardingState.AccountConnected || canViewAccountInfo ? (
-        <AccountInfoConnectedState />
+    <$AccountInfoSectionContainer className={className}>
+      {onboardingState === OnboardingState.AccountConnected || canViewAccountInfo || !isTablet ? (
+        <AccountInfoSection />
       ) : (
         <$DisconnectedAccountInfoContainer>
           <p>
@@ -59,14 +62,9 @@ const $DisconnectedAccountInfoContainer = styled.div`
   }
 `;
 
-const $AccountInfoSectionContainer = styled.div<{ showAccountInfo?: boolean }>`
+const $AccountInfoSectionContainer = styled.div`
   ${layoutMixins.column}
+
   height: var(--account-info-section-height);
   min-height: var(--account-info-section-height);
-
-  ${({ showAccountInfo }) =>
-    !showAccountInfo &&
-    css`
-      padding: 1.125em 1.25em 0.875em;
-    `}
 `;

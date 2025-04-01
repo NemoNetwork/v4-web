@@ -11,7 +11,6 @@ import { EMPTY_ARR } from '@/constants/objects';
 import { timeUnits } from '@/constants/time';
 
 import { useBreakpoints } from '@/hooks/useBreakpoints';
-import { useEnvConfig } from '@/hooks/useEnvConfig';
 import { useLocaleSeparators } from '@/hooks/useLocaleSeparators';
 import { useStringGetter } from '@/hooks/useStringGetter';
 import { useVaultPnlHistory } from '@/hooks/vaultsHooks';
@@ -22,7 +21,7 @@ import { TriangleIndicator } from '@/components/TriangleIndicator';
 import { TimeSeriesChart } from '@/components/visx/TimeSeriesChart';
 
 import { useAppSelector } from '@/state/appTypes';
-import { getChartDotBackground } from '@/state/configsSelectors';
+import { getChartDotBackground } from '@/state/appUiConfigsSelectors';
 import { getSelectedLocale } from '@/state/localizationSelectors';
 
 import { MustBigNumber, getNumberSign } from '@/lib/numbers';
@@ -42,6 +41,8 @@ const TIME_RANGES = [
   { value: '90d', labelNumDays: '90', time: 90 * timeUnits.day },
 ] as const;
 
+const finalBackupZoomDomain = 30 * timeUnits.day;
+
 export const VaultPnlChart = ({ className }: VaultPnlChartProps) => {
   const stringGetter = useStringGetter();
   const selectedLocale = useAppSelector(getSelectedLocale);
@@ -51,46 +52,50 @@ export const VaultPnlChart = ({ className }: VaultPnlChartProps) => {
   const [visibleTimeRange, setVisibleTimeRange] = useState<[number, number] | undefined>(undefined);
   const [hoveredTime, setHoveredTime] = useState<number | undefined>(undefined);
 
-  const megavaultMinimumDateTimeMs = useEnvConfig('megavaultHistoryStartDateMs');
   const data = useMemo(
-    () =>
-      vaultPnl
-        .map((v, index) => safeAssign({}, v, { index }))
-        .filter(
-          (f) =>
-            megavaultMinimumDateTimeMs == null ||
-            f.date == null ||
-            MustBigNumber(megavaultMinimumDateTimeMs).toNumber() <= f.date
-        ),
+    () => vaultPnl.map((v, index) => safeAssign({}, v, { index })),
     // need to churn reference so chart updates axes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [vaultPnl, selectedChart, megavaultMinimumDateTimeMs]
+    [vaultPnl, selectedChart]
   );
 
   const timeUnitsToRender = useMemo(() => {
-    const dataRange = data.length > 1 ? (data[data.length - 1].date ?? 0) - (data[0].date ?? 0) : 0;
+    const dataRange =
+      data.length > 1 ? (data[data.length - 1]!.date ?? 0) - (data[0]!.date ?? 0) : 0;
     const validRanges = TIME_RANGES.filter((t) => t.time <= dataRange + timeUnits.day * 3);
     return validRanges.map((t) => ({
       value: t.value,
       label: `${t.labelNumDays}${stringGetter({ key: STRING_KEYS.DAYS_ABBREVIATED })}`,
+      time: t.time,
     }));
   }, [data, stringGetter]);
 
-  const [selectedTimeRange, setSelectedTimeRange] = useState<
-    (typeof TIME_RANGES)[number]['value'] | undefined
-  >(timeUnitsToRender[timeUnitsToRender.length - 1]?.value);
+  // changes to this value trigger chart re-zoom
+  const [defaultZoomDomain, setDefaultZoomDomain] = useState<number>(finalBackupZoomDomain);
+
+  // just reflects the reality of the chart
+  const [currentZoomDomain, setCurrentZoomDomain] = useState<number>(defaultZoomDomain);
+
+  const effectiveCurrentTimeRange = timeUnitsToRender.find(
+    (t) => Math.abs(t.time - currentZoomDomain) <= timeUnits.day
+  );
 
   const handleZoom = useCallback(({ zoomDomain }: { zoomDomain: number | undefined }) => {
-    const matching = TIME_RANGES.find(
-      (t) => Math.abs(t.time - (zoomDomain ?? 0)) <= timeUnits.day
-    )?.value;
-    setSelectedTimeRange(matching);
+    setCurrentZoomDomain(zoomDomain ?? finalBackupZoomDomain);
   }, []);
-  const handleTimeRangeSelect = useCallback((timeRange: typeof selectedTimeRange | '') => {
-    if (timeRange !== '') {
-      setSelectedTimeRange(timeRange);
-    }
-  }, []);
+
+  const handleTimeRangeSelect = useCallback(
+    (timeRange: (typeof timeUnitsToRender)[number]['value'] | '') => {
+      if (timeRange !== '') {
+        const range = timeUnitsToRender.find((t) => t.value === timeRange)?.time;
+        if (range != null) {
+          setDefaultZoomDomain(range);
+        }
+      }
+    },
+    [timeUnitsToRender]
+  );
+
   const pointsInView = useMemo(
     () =>
       data
@@ -117,13 +122,18 @@ export const VaultPnlChart = ({ className }: VaultPnlChartProps) => {
     ? relevantDataPoints[relevantDataPoints.length - 1]
     : undefined;
   const pnlDiff = atLeastTwoPoints
-    ? relevantDataPoints[relevantDataPoints.length - 1] - relevantDataPoints[0]
+    ? relevantDataPoints[relevantDataPoints.length - 1]! - relevantDataPoints[0]!
     : undefined;
-  const pnlDiffPercent = atLeastTwoPoints ? (pnlDiff ?? 0) / relevantDataPoints[0] : undefined;
+  // must divide by equity no matter whether we are on pnl or equity
+  const pnlDiffPercent = atLeastTwoPoints
+    ? // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+      (pnlDiff ?? 0) / (pointsInView[0]?.equity || 1)
+    : undefined;
 
-  const xAccessorFunc = useCallback((datum: VaultPnlDatum) => datum?.date ?? 0, []);
+  const xAccessorFunc = useCallback((datum: VaultPnlDatum | undefined) => datum?.date ?? 0, []);
   const yAccessorFunc = useCallback(
-    (datum: VaultPnlDatum) => (selectedChart === 'pnl' ? datum?.totalPnl ?? 0 : datum?.equity ?? 0),
+    (datum: VaultPnlDatum | undefined) =>
+      selectedChart === 'pnl' ? datum?.totalPnl ?? 0 : datum?.equity ?? 0,
     [selectedChart]
   );
 
@@ -135,7 +145,7 @@ export const VaultPnlChart = ({ className }: VaultPnlChartProps) => {
         yAccessor: yAccessorFunc,
         colorAccessor: () =>
           atLeastTwoPoints
-            ? relevantDataPoints[relevantDataPoints.length - 1] - relevantDataPoints[0] >= 0
+            ? relevantDataPoints[relevantDataPoints.length - 1]! - relevantDataPoints[0]! >= 0
               ? 'var(--color-positive)'
               : 'var(--color-negative)'
             : 'var(--color-positive)',
@@ -167,15 +177,10 @@ export const VaultPnlChart = ({ className }: VaultPnlChartProps) => {
   const onVisibleDataChange = useCallback((inRangeData: VaultPnlDatum[]) => {
     setVisibleTimeRange(
       inRangeData.length > 1
-        ? [inRangeData[0].date ?? 0, inRangeData[inRangeData.length - 1].date ?? 0]
+        ? [inRangeData[0]!.date ?? 0, inRangeData[inRangeData.length - 1]!.date ?? 0]
         : undefined
     );
   }, []);
-
-  const zoomDomain =
-    selectedTimeRange != null
-      ? TIME_RANGES.find((t) => t.value === selectedTimeRange)?.time
-      : undefined;
 
   return (
     <div className={className}>
@@ -184,7 +189,7 @@ export const VaultPnlChart = ({ className }: VaultPnlChartProps) => {
           size={ButtonSize.Small}
           items={[
             { value: 'pnl', label: stringGetter({ key: STRING_KEYS.VAULT_PNL }) },
-            { value: 'equity', label: stringGetter({ key: STRING_KEYS.VAULT_EQUITY }) },
+            { value: 'equity', label: stringGetter({ key: STRING_KEYS.VAULT_TVL }) },
           ]}
           value={selectedChart}
           onValueChange={setSelectedChart}
@@ -192,7 +197,7 @@ export const VaultPnlChart = ({ className }: VaultPnlChartProps) => {
         <ToggleGroup
           size={ButtonSize.Small}
           items={timeUnitsToRender}
-          value={selectedTimeRange ?? ''}
+          value={effectiveCurrentTimeRange?.value ?? ''}
           onValueChange={handleTimeRangeSelect}
         />
       </div>
@@ -252,7 +257,7 @@ export const VaultPnlChart = ({ className }: VaultPnlChartProps) => {
           renderTooltip={renderTooltip}
           onTooltipContext={onTooltipContext}
           onZoom={handleZoom}
-          defaultZoomDomain={zoomDomain}
+          defaultZoomDomain={defaultZoomDomain}
           domainBasePadding={[0.01, 0]}
           minZoomDomain={timeUnits.day * 2.5}
           slotEmpty={undefined}

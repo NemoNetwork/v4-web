@@ -11,7 +11,14 @@
     "plugin:react-hooks/recommended",
     "prettier"
   ],
-  "overrides": [],
+  "overrides": [
+    {
+      "files": ["**/bonsai/**"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ],
   "parserOptions": {
     "project": "./tsconfig.json",
     "ecmaVersion": "latest",
@@ -42,6 +49,20 @@
     "no-multi-assign": "off",
     "no-nested-ternary": "off",
     "no-param-reassign": ["error", { "props": false }],
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          "@/bonsai/*/*",
+          "!@/bonsai/ontology",
+          "!@/bonsai/public-calculators/*",
+          "!@/bonsai/forms/*",
+          "!@/bonsai/lib/*",
+          "!@/bonsai/types/summaryTypes",
+          "!@/bonsai/types/orderbookTypes"
+        ]
+      }
+    ],
     "no-return-assign": "off",
     "no-return-await": "off",
     "no-underscore-dangle": "off",
@@ -69,6 +90,7 @@
     "react/sort-comp": "off",
     "react/jsx-pascal-case": "off",
     "@typescript-eslint/no-use-before-define": "off",
+    "@typescript-eslint/no-unnecessary-condition": "warn",
     "@typescript-eslint/comma-dangle": "off",
     "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
     "@typescript-eslint/prefer-nullish-coalescing": "error",

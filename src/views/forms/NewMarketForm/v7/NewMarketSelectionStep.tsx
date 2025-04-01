@@ -1,53 +1,62 @@
 import { FormEvent, useMemo } from 'react';
 
 import { LightningBoltIcon } from '@radix-ui/react-icons';
-import { shallowEqual } from 'react-redux';
+import { Link as NavLink } from 'react-router-dom';
 import styled from 'styled-components';
 
 import { OnboardingState } from '@/constants/account';
 import { AlertType } from '@/constants/alerts';
+import { AnalyticsEvents } from '@/constants/analytics';
 import { ButtonAction, ButtonType } from '@/constants/buttons';
 import { STRING_KEYS } from '@/constants/localization';
-import { USD_DECIMALS } from '@/constants/numbers';
+import { DEFAULT_VAULT_DEPOSIT_FOR_LAUNCH } from '@/constants/numbers';
+import { AppRoute } from '@/constants/routes';
 
 import { useLaunchableMarkets } from '@/hooks/useLaunchableMarkets';
 import { useStringGetter } from '@/hooks/useStringGetter';
+import { useURLConfigs } from '@/hooks/useURLConfigs';
 
+import { LinkOutIcon } from '@/icons';
 import { formMixins } from '@/styles/formMixins';
 import { layoutMixins } from '@/styles/layoutMixins';
 
 import { AlertMessage } from '@/components/AlertMessage';
 import { Button } from '@/components/Button';
 import { Details, type DetailsItem } from '@/components/Details';
-import { DiffOutput } from '@/components/DiffOutput';
 import { FormInput } from '@/components/FormInput';
 import { InputType } from '@/components/Input';
+import { Link } from '@/components/Link';
 import { LoadingSpace } from '@/components/Loading/LoadingSpinner';
 import { Output, OutputType } from '@/components/Output';
 import { SearchSelectMenu } from '@/components/SearchSelectMenu';
 import { Tag } from '@/components/Tag';
 import { WithDetailsReceipt } from '@/components/WithDetailsReceipt';
 import { WithReceipt } from '@/components/WithReceipt';
+import { MegaVaultYieldOutput } from '@/views/MegaVaultYieldOutput';
 import { OnboardingTriggerButton } from '@/views/dialogs/OnboardingTriggerButton';
 
-import { getOnboardingState, getSubaccount } from '@/state/accountSelectors';
+import { getOnboardingState } from '@/state/accountSelectors';
 import { useAppSelector } from '@/state/appTypes';
 
+import { track } from '@/lib/analytics/analytics';
 import { getDisplayableAssetFromBaseAsset, getDisplayableTickerFromMarket } from '@/lib/assetUtils';
-import { orEmptyObj } from '@/lib/typeUtils';
 
 type NewMarketSelectionStepProps = {
+  hasDefault?: boolean;
   tickerToAdd?: string;
   setTickerToAdd: (ticker: string) => void;
   onConfirmMarket: () => void;
+  freeCollateralDetailItem: DetailsItem;
   receiptItems: DetailsItem[];
   shouldHideTitleAndDescription?: boolean;
 };
 
 export const NewMarketSelectionStep = ({
+  hasDefault,
   tickerToAdd,
   setTickerToAdd,
   onConfirmMarket,
+  freeCollateralDetailItem,
   receiptItems,
   shouldHideTitleAndDescription,
 }: NewMarketSelectionStepProps) => {
@@ -55,8 +64,7 @@ export const NewMarketSelectionStep = ({
   const isDisconnected = onboardingState === OnboardingState.Disconnected;
   const launchableMarkets = useLaunchableMarkets();
   const stringGetter = useStringGetter();
-  const subAccount = orEmptyObj(useAppSelector(getSubaccount, shallowEqual));
-  const { freeCollateral } = subAccount;
+  const { launchMarketLearnMore } = useURLConfigs();
 
   const alertMessage = useMemo(() => {
     let alert: { type: AlertType; message: string } | undefined;
@@ -78,25 +86,38 @@ export const NewMarketSelectionStep = ({
         </h2>
         <span tw="text-base text-color-text-0">
           {stringGetter({
-            key: STRING_KEYS.MARKET_LAUNCH_DETAILS_3,
+            key: STRING_KEYS.MARKET_LAUNCH_DETAILS_4,
             params: {
-              APR_PERCENTAGE: (
+              APR_PERCENTAGE: <MegaVaultYieldOutput tw="inline-block" />,
+              DEPOSIT_AMOUNT: (
                 <Output
-                  type={OutputType.Percent}
-                  tw="inline-block text-color-success"
-                  value={0.3456}
+                  useGrouping
+                  type={OutputType.Fiat}
+                  tw="inline-block"
+                  value={DEFAULT_VAULT_DEPOSIT_FOR_LAUNCH}
                 />
               ),
-              DEPOSIT_AMOUNT: (
-                <Output useGrouping type={OutputType.Fiat} tw="inline-block" value={10_000} />
+              NUM_DAYS: 30,
+              MEGAVAULT_LINK: (
+                <NavLink
+                  tw="inline-flex items-center gap-[0.25ch] text-[var(--link-color)] [--link-color:var(--color-text-1)] hover:underline"
+                  to={AppRoute.Vault}
+                >
+                  {stringGetter({ key: STRING_KEYS.MEGAVAULT })}
+                  <LinkOutIcon />
+                </NavLink>
               ),
-              PAST_DAYS: 30,
             },
-          })}
+          })}{' '}
+          <Link href={launchMarketLearnMore} tw="inline">
+            {stringGetter({
+              key: STRING_KEYS.LEARN_MORE_ARROW,
+            })}
+          </Link>
         </span>
       </>
     );
-  }, [shouldHideTitleAndDescription, stringGetter]);
+  }, [launchMarketLearnMore, shouldHideTitleAndDescription, stringGetter]);
 
   const shortenedTicker = tickerToAdd ? getDisplayableTickerFromMarket(tickerToAdd) : tickerToAdd;
 
@@ -113,20 +134,25 @@ export const NewMarketSelectionStep = ({
         <LoadingSpace id="launch-markets" />
       ) : (
         <>
-          <SearchSelectMenu
+          <$SearchSelectMenu
+            disabled={hasDefault}
             items={[
               {
                 group: 'markets',
                 groupLabel: stringGetter({ key: STRING_KEYS.MARKETS }),
-                items:
-                  launchableMarkets.data?.map((launchableMarket) => ({
-                    value: launchableMarket.id,
-                    label: getDisplayableTickerFromMarket(launchableMarket.id),
-                    tag: getDisplayableAssetFromBaseAsset(launchableMarket.asset),
-                    onSelect: () => {
-                      setTickerToAdd(launchableMarket.id);
-                    },
-                  })) ?? [],
+                items: launchableMarkets.data.map((launchableMarket) => ({
+                  value: launchableMarket.id,
+                  label: getDisplayableTickerFromMarket(launchableMarket.id),
+                  tag: getDisplayableAssetFromBaseAsset(launchableMarket.asset),
+                  onSelect: () => {
+                    setTickerToAdd(launchableMarket.id);
+                    track(
+                      AnalyticsEvents.LaunchMarketFormSelectedAsset({
+                        asset: launchableMarket.asset,
+                      })
+                    );
+                  },
+                })),
               },
             ]}
             label={stringGetter({ key: STRING_KEYS.MARKETS })}
@@ -138,40 +164,22 @@ export const NewMarketSelectionStep = ({
             ) : (
               `${stringGetter({ key: STRING_KEYS.EG })} "BTC-USD"`
             )}
-          </SearchSelectMenu>
+          </$SearchSelectMenu>
 
-          <WithDetailsReceipt
-            side="bottom"
-            detailItems={[
-              {
-                key: 'cross-free-collateral',
-                label: stringGetter({ key: STRING_KEYS.CROSS_FREE_COLLATERAL }),
-                value: (
-                  <DiffOutput
-                    withDiff
-                    type={OutputType.Fiat}
-                    value={freeCollateral?.current}
-                    newValue={88000}
-                    fractionDigits={USD_DECIMALS}
-                  />
-                ),
-              },
-            ]}
-            tw="[--withReceipt-backgroundColor:--color-layer-2]"
-          >
+          <WithDetailsReceipt side="bottom" detailItems={[freeCollateralDetailItem]}>
             <FormInput
               disabled
               type={InputType.Currency}
-              label={stringGetter({ key: STRING_KEYS.REQUIRED_AMOUNT_TO_DEPOSIT })}
+              label={stringGetter({ key: STRING_KEYS.AMOUNT_TO_ADD })}
               placeholder="$10,000"
-              value="$10000"
+              value={`$${DEFAULT_VAULT_DEPOSIT_FOR_LAUNCH}`}
             />
           </WithDetailsReceipt>
 
           {alertMessage}
 
           <WithReceipt
-            tw="[--withReceipt-backgroundColor:--color-layer-2]"
+            tw="min-h-0"
             slotReceipt={<Details items={receiptItems} tw="px-0.75 pb-0.25 pt-0.375 text-small" />}
           >
             {isDisconnected ? (
@@ -191,6 +199,7 @@ export const NewMarketSelectionStep = ({
     </$Form>
   );
 };
+
 const $Form = styled.form`
   ${formMixins.transfersForm}
   ${layoutMixins.stickyArea0}
@@ -202,5 +211,11 @@ const $Form = styled.form`
     margin: 0;
     font: var(--font-large-medium);
     color: var(--color-text-2);
+  }
+`;
+
+const $SearchSelectMenu = styled(SearchSelectMenu)`
+  button:disabled {
+    cursor: default;
   }
 `;

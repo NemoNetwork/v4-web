@@ -1,40 +1,30 @@
+import { BonsaiCore } from '@/bonsai/ontology';
+import { VaultFormAccountData } from '@/bonsai/public-calculators/vaultFormValidation';
+
 import { OnboardingState, OnboardingSteps } from '@/constants/account';
+import { ConnectorType } from '@/constants/wallets';
 
 import {
   getOnboardingGuards,
   getOnboardingState,
-  getSubaccountId,
   getSubaccountOpenOrders,
-  getUnbondingDelegations,
 } from '@/state/accountSelectors';
 import { createAppSelector } from '@/state/appTypes';
 
-import { isOrderStatusOpen } from '@/lib/orders';
+import { isNewOrderStatusOpen } from '@/lib/orders';
 
-import { getCurrentMarketId } from './perpetualsSelectors';
+import { getSubaccountId } from './accountInfoSelectors';
+import { getCurrentMarketId } from './currentMarketSelectors';
+import { getSourceAccount } from './walletSelectors';
 
 export const calculateOnboardingStep = createAppSelector(
-  [getOnboardingState, getOnboardingGuards],
-  (onboardingState: OnboardingState, onboardingGuards: ReturnType<typeof getOnboardingGuards>) => {
-    const { hasPreviousTransactions } = onboardingGuards;
-
+  [getOnboardingState],
+  (onboardingState: OnboardingState) => {
     return {
       [OnboardingState.Disconnected]: OnboardingSteps.ChooseWallet,
       [OnboardingState.WalletConnected]: OnboardingSteps.KeyDerivation,
-      [OnboardingState.AccountConnected]: !hasPreviousTransactions
-        ? OnboardingSteps.DepositFunds
-        : undefined,
+      [OnboardingState.AccountConnected]: undefined,
     }[onboardingState];
-  }
-);
-
-/**
- * @description calculate whether an account is in a state where they can trade
- */
-export const calculateCanAccountTrade = createAppSelector(
-  [getOnboardingState],
-  (onboardingState: OnboardingState) => {
-    return onboardingState === OnboardingState.AccountConnected;
   }
 );
 
@@ -51,12 +41,23 @@ export const calculateCanViewAccount = createAppSelector(
 
 /**
  * @description calculate whether the client is in view only mode
- * (Onboarding State is WalletConnected and Abacus has a connected subaccount)
  */
 export const calculateIsAccountViewOnly = createAppSelector(
-  [getOnboardingState, calculateCanViewAccount],
-  (onboardingState: OnboardingState, canViewAccountInfo: boolean) =>
-    onboardingState !== OnboardingState.AccountConnected && canViewAccountInfo
+  [getOnboardingState, calculateCanViewAccount, getSourceAccount],
+  (onboardingState: OnboardingState, canViewAccountInfo: boolean, sourceAccount) =>
+    sourceAccount.walletInfo?.connectorType === ConnectorType.Test
+      ? true
+      : onboardingState !== OnboardingState.AccountConnected && canViewAccountInfo
+);
+
+/**
+ * @description calculate whether an account is in a state where they can trade
+ */
+export const calculateCanAccountTrade = createAppSelector(
+  [getOnboardingState, calculateIsAccountViewOnly],
+  (onboardingState: OnboardingState, isAccountViewOnly: boolean) => {
+    return onboardingState === OnboardingState.AccountConnected && !isAccountViewOnly;
+  }
 );
 
 /**
@@ -99,32 +100,16 @@ export const calculateShouldRenderActionsInPositionsTable = () =>
     }
   );
 
-/**
- * @description calculate sorted unbonding delegations (from soonest to complete unbonding -> latest)
- */
-export const calculateSortedUnbondingDelegations = createAppSelector(
-  [getUnbondingDelegations],
-  (unbondingDelegations) => {
-    if (unbondingDelegations?.length) {
-      const sortedUnbondingDelegations = [...unbondingDelegations];
-      sortedUnbondingDelegations.sort(
-        (a, b) => new Date(a.completionTime).getTime() - new Date(b.completionTime).getTime()
-      );
-      return sortedUnbondingDelegations;
-    }
-    return unbondingDelegations;
-  }
-);
-
 export const calculateHasCancelableOrders = () =>
   createAppSelector(
     [getSubaccountOpenOrders, (s, marketId?: string) => marketId],
     (openOrders, marketId) => {
       // the extra isOrderStatusOpen check filter the order to also not be canceling / best effort canceled
-      return (
-        openOrders?.some(
-          (order) => (!marketId || order.marketId === marketId) && isOrderStatusOpen(order.status)
-        ) ?? false
+      return openOrders.some(
+        (order) =>
+          (!marketId || order.marketId === marketId) &&
+          order.status != null &&
+          isNewOrderStatusOpen(order.status)
       );
     }
   );
@@ -133,19 +118,25 @@ export const calculateHasCancelableOrdersInOtherMarkets = createAppSelector(
   [getSubaccountOpenOrders, getCurrentMarketId],
   (openOrders, marketId) =>
     marketId !== undefined &&
-    (openOrders?.some((order) => order.marketId !== marketId && isOrderStatusOpen(order.status)) ??
-      false)
+    openOrders.some(
+      (order) =>
+        order.marketId !== marketId && order.status != null && isNewOrderStatusOpen(order.status)
+    )
 );
 
+const selectCurrentMarginUsage = createAppSelector(
+  [BonsaiCore.account.parentSubaccountSummary.data],
+  (d) => d?.marginUsage?.toNumber()
+);
+const selectCurrentFreeCollateral = createAppSelector(
+  [BonsaiCore.account.parentSubaccountSummary.data],
+  (d) => d?.freeCollateral.toNumber()
+);
 export const selectSubaccountStateForVaults = createAppSelector(
-  [
-    (state) => state.account.subaccount?.marginUsage?.current,
-    (state) => state.account.subaccount?.freeCollateral?.current,
-    calculateCanViewAccount,
-  ],
-  (marginUsage, freeCollateral, canViewAccount) => ({
-    marginUsage,
-    freeCollateral,
+  [selectCurrentMarginUsage, selectCurrentFreeCollateral, calculateCanViewAccount],
+  (marginUsage, freeCollateral, canViewAccount): VaultFormAccountData => ({
+    marginUsage: marginUsage ?? undefined,
+    freeCollateral: freeCollateral ?? undefined,
     canViewAccount,
   })
 );

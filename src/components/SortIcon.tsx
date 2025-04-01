@@ -18,7 +18,7 @@ export const SortIcon = ({ sortDirection, className }: ElementProps & StyleProps
         iconName={IconName.RoundedArrow}
         aria-hidden="true"
         direction="up"
-        highlighted={sortDirection === 'ascending'}
+        $highlighted={sortDirection === 'ascending'}
         size="0.75em"
         tw="relative right-[-2px] top-[-3px]"
       />
@@ -26,7 +26,7 @@ export const SortIcon = ({ sortDirection, className }: ElementProps & StyleProps
         iconName={IconName.RoundedArrow}
         aria-hidden="true"
         direction="down"
-        highlighted={sortDirection === 'descending'}
+        $highlighted={sortDirection === 'descending'}
         size="0.75em"
         tw="relative bottom-[-3px] left-[-2px]"
       />
@@ -43,15 +43,16 @@ const $SortIcon = styled.div<{ hidden: boolean }>`
     hidden
       ? css`
           opacity: 0;
+          width: 0;
         `
       : css`
           opacity: 1;
         `}
 `;
 
-const $Icon = styled(Icon)<{ direction: 'up' | 'down'; highlighted: boolean }>`
-  ${({ highlighted }) =>
-    highlighted
+const $Icon = styled(Icon)<{ direction: 'up' | 'down'; $highlighted: boolean }>`
+  ${({ $highlighted }) =>
+    $highlighted
       ? css`
           color: var(--color-text-2);
         `

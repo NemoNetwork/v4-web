@@ -1,23 +1,14 @@
 import { useMemo } from 'react';
 
-import { useQueries, useQuery } from '@tanstack/react-query';
-import { shallowEqual } from 'react-redux';
-
-import {
-  MetadataServiceAsset,
-  MetadataServiceCandlesTimeframes,
-  MetadataServiceInfoResponse,
-  MetadataServicePricesResponse,
-} from '@/constants/assetMetadata';
-import { timeUnits } from '@/constants/time';
+import { mergeLoadableStatusState } from '@/bonsai/lib/mapLoadable';
+import { BonsaiCore } from '@/bonsai/ontology';
 
 import { useAppSelector } from '@/state/appTypes';
-import { getMarketIds } from '@/state/perpetualsSelectors';
 
 import metadataClient from '@/clients/metadataService';
-import { getAssetFromMarketId } from '@/lib/assetUtils';
+import { getAssetFromMarketId, getMarketIdFromAsset } from '@/lib/assetUtils';
 import { getTickSizeDecimalsFromPrice } from '@/lib/numbers';
-import { mapMetadataServiceCandles } from '@/lib/tradingView/utils';
+import { orEmptyRecord } from '@/lib/typeUtils';
 
 export const useMetadataService = () => {
   const metadataQuery = useQueries({
@@ -53,10 +44,10 @@ export const useMetadataService = () => {
             name: info[key].name,
             logo: info[key].logo,
             urls: {
-              website: "",
-              technicalDoc: "",
+              website: '',
+              technicalDoc: '',
               // cmc: info[key].urls.cmc,
-              cmc: "",
+              cmc: '',
             },
             sectorTags: info[key].sector_tags,
             exchanges: info[key].exchanges,
@@ -96,47 +87,30 @@ export const useMetadataServiceAssetFromId = (marketId?: string) => {
 
   return launchableAsset;
 };
-
 export const useLaunchableMarkets = () => {
-  const marketIds = useAppSelector(getMarketIds, shallowEqual);
-  const metadataServiceData = useMetadataService();
+  const perpsRaw = orEmptyRecord(useAppSelector(BonsaiCore.markets.markets.data));
+  const assetsRaw = orEmptyRecord(useAppSelector(BonsaiCore.markets.assets.data));
+  const loadingStateMarkets = useAppSelector(BonsaiCore.markets.markets.loading);
+  const loadingStateAssets = useAppSelector(BonsaiCore.markets.assets.loading);
+  const loadingState = mergeLoadableStatusState(loadingStateMarkets, loadingStateAssets);
 
   const filteredPotentialMarkets: { id: string; asset: string }[] = useMemo(() => {
-    const assets = Object.keys(metadataServiceData.data).map((asset) => {
+    const assets = Object.values(assetsRaw).map((asset) => {
       return {
-        id: `${asset}-USD`,
-        asset,
+        id: getMarketIdFromAsset(asset.assetId),
+        asset: asset.assetId,
       };
     });
 
     return assets.filter(({ id }) => {
-      return !marketIds.includes(id);
+      return perpsRaw[id] == null;
     });
-  }, [marketIds, metadataServiceData.data]);
+  }, [assetsRaw, perpsRaw]);
 
   return {
-    ...metadataServiceData,
     data: filteredPotentialMarkets,
-  };
-};
-
-export const useMetadataServiceCandles = (
-  asset?: string,
-  timeframe?: MetadataServiceCandlesTimeframes
-) => {
-  const candlesQuery = useQuery({
-    enabled: !!asset && !!timeframe,
-    queryKey: ['candles', asset, timeframe],
-    queryFn: async () => {
-      return metadataClient.getCandles({ asset: asset!, timeframe: timeframe! });
-    },
-    refetchInterval: timeUnits.minute * 5,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-  });
-
-  return {
-    ...candlesQuery,
-    data: candlesQuery.data?.[asset ?? ''].map(mapMetadataServiceCandles),
+    isLoading:
+      (Object.keys(perpsRaw).length === 0 || Object.keys(assetsRaw).length === 0) &&
+      (loadingState === 'idle' || loadingState === 'pending'),
   };
 };

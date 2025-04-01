@@ -1,20 +1,21 @@
 import { OrderSide } from '@nemo-network/v4-client-js/src';
 
 import { STRING_KEYS } from '@/constants/localization';
+import { IndexerOrderSide } from '@/types/indexer/indexerApiGen';
 
 import { useStringGetter } from '@/hooks/useStringGetter';
 
 import { Tag, TagSign, TagSize, TagType } from './Tag';
 
 type ElementProps = {
-  orderSide: OrderSide;
+  orderSide: OrderSide | IndexerOrderSide;
 };
 
 type StyleProps = {
   size?: TagSize;
 };
 
-const orderSideTagSign: Record<OrderSide, TagSign> = {
+const orderSideTagSign: Record<OrderSide | IndexerOrderSide, TagSign> = {
   [OrderSide.BUY]: TagSign.Positive,
   [OrderSide.SELL]: TagSign.Negative,
 };
