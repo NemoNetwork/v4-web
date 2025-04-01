@@ -1,7 +1,7 @@
 name: CI
 
 on:
-  pull_request:
+  deployment_status:
 
 jobs:
   test:
@@ -10,17 +10,18 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Node
-      uses: actions/setup-node@v4
-      with:
-        node-version: 18
-        cache: 'pnpm'
-
     - name: Install pnpm
       uses: pnpm/action-setup@v2
       with:
         version: 8
         run_install: false
+
+    - name: Set up Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
+        cache: 'pnpm'
+        cache-dependency-path: '**/pnpm-lock.yaml'
 
     - name: Setup pnpm cache
       uses: actions/cache@v3
