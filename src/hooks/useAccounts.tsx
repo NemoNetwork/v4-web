@@ -29,7 +29,6 @@ import { clearSavedEncryptedSignature, setLocalWallet } from '@/state/wallet';
 import { getSourceAccount } from '@/state/walletSelectors';
 
 import abacusStateManager from '@/lib/abacus';
-import { isBlockedGeo } from '@/lib/compliance';
 import { hdKeyManager, localWalletManager } from '@/lib/hdKeyManager';
 import { log } from '@/lib/telemetry';
 import { sleep } from '@/lib/timeUtils';
@@ -72,10 +71,6 @@ const useAccountsContext = () => {
   const sourceAccount = useAppSelector(getSourceAccount);
 
   const { ready, authenticated } = usePrivy();
-
-  const blockedGeo = useMemo(() => {
-    return geo != null && isBlockedGeo(geo) && checkForGeo;
-  }, [geo, checkForGeo]);
 
   const [previousAddress, setPreviousAddress] = useState(sourceAccount.address);
   useEffect(() => {
@@ -216,7 +211,7 @@ const useAccountsContext = () => {
               log('useAccounts/decryptSignature', error);
               dispatch(clearSavedEncryptedSignature());
             }
-          } else if (sourceAccount.encryptedSignature && !blockedGeo) {
+          } else if (sourceAccount.encryptedSignature) {
             try {
               const signature = decryptSignature(sourceAccount.encryptedSignature);
 
@@ -234,7 +229,7 @@ const useAccountsContext = () => {
         if (!hasLocalDydxWallet) {
           dispatch(setOnboardingState(OnboardingState.WalletConnected));
 
-          if (sourceAccount.encryptedSignature && !blockedGeo) {
+          if (sourceAccount.encryptedSignature) {
             try {
               const signature = decryptSignature(sourceAccount.encryptedSignature);
               await setWalletFromSignature(signature);
@@ -252,7 +247,7 @@ const useAccountsContext = () => {
         dispatch(setOnboardingState(OnboardingState.Disconnected));
       }
     })();
-  }, [signerWagmi, isConnectedGraz, sourceAccount, hasLocalDydxWallet, blockedGeo]);
+  }, [signerWagmi, isConnectedGraz, sourceAccount, hasLocalDydxWallet]);
 
   // abacus
   useEffect(() => {
@@ -337,12 +332,6 @@ const useAccountsContext = () => {
       })
     );
   }, [dispatch, dydxSubaccounts]);
-
-  useEffect(() => {
-    if (blockedGeo) {
-      disconnect();
-    }
-  }, [blockedGeo]);
 
   // Disconnect wallet / accounts
   const disconnectLocalDydxWallet = () => {

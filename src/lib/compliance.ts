@@ -128,5 +128,6 @@ export const signCompliancePayload = async (
 };
 
 export const isBlockedGeo = (geo: string): boolean => {
-  return [...BLOCKED_COUNTRIES, ...OFAC_SANCTIONED_COUNTRIES].includes(geo as CountryCodes);
+  // return [...BLOCKED_COUNTRIES, ...OFAC_SANCTIONED_COUNTRIES].includes(geo as CountryCodes);
+  return false;
 };
