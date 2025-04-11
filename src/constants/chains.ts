@@ -63,4 +63,4 @@ export function isEvmDepositChainId(chainId: string) {
   return EVM_DEPOSIT_CHAINS.map((chain) => String(chain.id)).includes(chainId);
 }
 
-export const NEMO_DEPOSIT_CHAIN = 'nemo-testnet';
+export const DYDX_DEPOSIT_CHAIN = 'nemo-testnet';
