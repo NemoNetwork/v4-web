@@ -166,7 +166,7 @@ async function addMarkets(
   const client = await CompositeClient.connect(network);
   const wallets: LocalWalletType[] = await Promise.all(
     MNEMONICS.slice(0, config.numValidators).map((mnemonic) => {
-      return LocalWallet.fromMnemonic(mnemonic, 'dydx');
+      return LocalWallet.fromMnemonic(mnemonic, 'nemo');
     })
   );
 

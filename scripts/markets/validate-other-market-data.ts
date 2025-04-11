@@ -314,7 +314,7 @@ async function validateAgainstLocalnet(proposals: Proposal[]): Promise<void> {
   const client = await CompositeClient.connect(network);
   const wallets: LocalWalletType[] = await Promise.all(
     MNEMONICS.map((mnemonic) => {
-      return LocalWallet.fromMnemonic(mnemonic, 'dydx');
+      return LocalWallet.fromMnemonic(mnemonic, 'nemo');
     })
   );
 
@@ -461,9 +461,9 @@ async function validateAgainstLocalnet(proposals: Proposal[]): Promise<void> {
       continue;
     }
 
-    const isDydxUsd = proposal.params.ticker.toLowerCase() === 'dydx-usd';
+    const isNemoUsd = proposal.params.ticker.toLowerCase() === 'nemo-usd';
     // Validate price.
-    const price = await client.validatorClient.get.getPrice(isDydxUsd ? 1000001 : marketId);
+    const price = await client.validatorClient.get.getPrice(isNemoUsd ? 1000001 : marketId);
     validatePrice(price.marketPrice!, proposal, allErrors);
 
     // Validate clob pair.
