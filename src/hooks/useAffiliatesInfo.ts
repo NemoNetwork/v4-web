@@ -52,7 +52,7 @@ export const useAffiliateMetadata = (dydxAddress?: string) => {
 
       const data: AffiliatesMetadata | undefined = await metaDataResponse.json();
       const totalVolume: { totalVolume: number } | undefined = await totalVolumeResponse.json();
-      const isEligible = Boolean(data?.isVolumeEligible) || Boolean(affiliateInfo?.isWhitelisted);
+      const isEligible = Boolean(data?.isVolumeEligible);
 
       return { metadata: data, affiliateInfo, isEligible, totalVolume: totalVolume?.totalVolume };
     } catch (error) {
@@ -78,7 +78,7 @@ const useAffiliatesStatus = (dydxAddress?: string) => {
   const fetchAccountStats = async () => {
     if (!dydxAddress || !compositeClient) return undefined;
 
-    const endpoint = `${compositeClient.indexerClient.config.restEndpoint}/v4/affiliates/snapshot?addressFilter=${encodeURIComponent(dydxAddress)}`;
+    const endpoint = `${compositeClient.indexerClient.config.restEndpoint}/affiliates/snapshot?addressFilter=${encodeURIComponent(dydxAddress)}`;
 
     try {
       const res = await safeFetch(endpoint, {

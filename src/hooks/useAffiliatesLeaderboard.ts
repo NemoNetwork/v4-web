@@ -14,7 +14,7 @@ export const useAffiliatesLeaderboard = () => {
   const fetchAffiliateStats = async () => {
     if (!compositeClient) return undefined;
 
-    const endpoint = `${compositeClient.indexerClient.config.restEndpoint}/v4/affiliates/snapshot?sortByAffiliateEarning=true&limit=${PAGE_SIZE}`;
+    const endpoint = `${compositeClient.indexerClient.config.restEndpoint}/affiliates/snapshot?sortByAffiliateEarning=true&limit=${PAGE_SIZE}`;
 
     try {
       const response = await fetch(endpoint, {

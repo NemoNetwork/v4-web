@@ -9,7 +9,7 @@ export const useReferralAddress = (refCode?: string) => {
     if (!compositeClient || !refCode) {
       return undefined;
     }
-    const endpoint = `${compositeClient.indexerClient.config.restEndpoint}/v4/affiliates/address`;
+    const endpoint = `${compositeClient.indexerClient.config.restEndpoint}/affiliates/address`;
     const response = await fetch(`${endpoint}?referralCode=${encodeURIComponent(refCode)}`, {
       method: 'GET',
       headers: {
