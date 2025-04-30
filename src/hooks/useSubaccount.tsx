@@ -103,8 +103,10 @@ const useSubaccountContext = ({ localDydxWallet }: { localDydxWallet?: LocalWall
       }: {
         dydxAddress: DydxAddress;
         subaccountNumber: number;
-        // need to change amount
-      }) => faucetClient?.fill(dydxAddress, subaccountNumber, 10),
+      }) => {
+        const amount = 100 * 10 ** 6;
+        return faucetClient?.fill(dydxAddress, subaccountNumber, amount);
+      },
 
       getNativeTokens: async ({ dydxAddress }: { dydxAddress: DydxAddress }) =>
         faucetClient?.fillNative(dydxAddress),
