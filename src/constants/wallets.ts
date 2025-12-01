@@ -5,14 +5,14 @@ import { EIP6963ProviderInfo } from 'mipd';
 import { STRING_KEYS } from '@/constants/localization';
 
 import {
-    CoinbaseIcon,
-    EmailIcon,
-    GenericWalletIcon,
-    KeplrIcon,
-    MetaMaskIcon,
-    OkxWalletIcon,
-    PhantomIcon,
-    WalletConnectIcon,
+  CoinbaseIcon,
+  EmailIcon,
+  GenericWalletIcon,
+  KeplrIcon,
+  MetaMaskIcon,
+  OkxWalletIcon,
+  PhantomIcon,
+  WalletConnectIcon,
 } from '@/icons';
 
 import { DydxChainId, WALLETS_CONFIG_MAP } from './networks';
@@ -161,12 +161,12 @@ export const wallets = {
  */
 export const getSignTypedData = (selectedDydxChainId: DydxChainId) =>
   ({
-    primaryType: 'dYdX',
+    primaryType: 'Nemo',
     domain: {
       name: WALLETS_CONFIG_MAP[selectedDydxChainId].signTypedDataDomainName,
     },
     types: {
-      dYdX: [{ name: 'action', type: 'string' }],
+      Nemo: [{ name: 'action', type: 'string' }],
     },
     message: {
       action: WALLETS_CONFIG_MAP[selectedDydxChainId].signTypedDataAction,
